@@ -636,7 +636,8 @@ def ConvertUnitsBack(ParamToModify, model):
         try:
             # update The quantity back to the current units (the units that we started with) units
             # so the display will be in the right units
-            currQ = prefQ.to(currQ)
+            #currQ = prefQ.to(currQ)
+            currQ = currQ.to(prefQ)
         except BaseException as ex:
             print(str(ex))
             print("Error: GEOPHIRES failed to convert your units for " + ParamToModify.Name +
@@ -650,8 +651,10 @@ def ConvertUnitsBack(ParamToModify, model):
                   " Exiting.")
             sys.exit()
 
-        # rest the value
-        ParamToModify.value = currQ.magnitude
+        # reset the values
+        if ParamToModify.value != currQ.magnitude:
+            ParamToModify.value = currQ.magnitude
+            ParamToModify.CurrentUnits = ParamToModify.PreferredUnits
     model.logger.info("Complete " + str(__name__) + ": " + sys._getframe().f_code.co_name)
 
 
