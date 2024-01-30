@@ -211,7 +211,7 @@ class HIP_RA:
             CurrentUnits=DensityUnit.KGPERKILOMETERS3,
             Required=True,
             ErrMessage='calculate a value based on the water temperature',
-            ToolTipText='Density Of Water [1.0E+12 kg/km3]',
+            ToolTipText='Density Of Reservoir Fluid [assune tio be pure water, at 1.0E+12 kg/km3]',
         )
         self.rock_density = self.ParameterDict[self.rock_density.Name] = floatParameter(
             'Density Of Reservoir Rock',
@@ -223,7 +223,7 @@ class HIP_RA:
             CurrentUnits=DensityUnit.KGPERKILOMETERS3,
             Required=True,
             ErrMessage='assume default Density Of Rock (2.55E+12 kg/km3)',
-            ToolTipText='Heat Density Of Rock [2.55E+12 kg/km3]',
+            ToolTipText='Density Of Rock [2.55E+12 kg/km3]',
         )
         self.rock_recoverable_heat = self.ParameterDict[self.rock_recoverable_heat.Name] = floatParameter(
             'Rock Recoverable Heat',
@@ -573,6 +573,9 @@ class HIP_RA:
             rock_net_enthalpy = rock_enthalpy_func(self.mass_rock.value, self.rock_heat_capacity.value, delta_temperature_k)
             rock_net_entropy = rock_entropy_func()
 
+            self.enthalpy_rock.value = (self.rock_heat_capacity.value * delta_temperature_k * self.volume_rock.value) / self.mass_rock.value
+
+
             # calculate the stored heat of the rock and the fluid in the reservoir (in kJ)
             # note that the rock stored heat is a function of the volume, so we multiple times the volume of the rock (in km3)
             # and the fluid stored heat is a function of the mass of the fluid, so we multiply times the mass of the fluid (in kg)
@@ -584,7 +587,7 @@ class HIP_RA:
 
             # calculate the maximum energy out per unit of mass (in kJ/kg)
 #            self.enthalpy_rock.value = fluid_net_enthalpy - (delta_temperature_k * rock_net_entropy)
-            self.enthalpy_rock.value = rock_net_enthalpy - (delta_temperature_k * rock_net_entropy)
+#            self.enthalpy_rock.value = rock_net_enthalpy - (delta_temperature_k * rock_net_entropy)
             self.enthalpy_fluid.value = fluid_net_enthalpy - (delta_temperature_k * fluid_net_entropy)
             #self.enthalpy_rock.value = self.stored_heat_rock.value/self.mass_rock.value
             #self.enthalpy_fluid.value = self.stored_heat_fluid.value/self.mass_fluid.value
