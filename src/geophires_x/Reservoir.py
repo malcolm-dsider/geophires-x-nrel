@@ -49,12 +49,12 @@ class Reservoir:
         self.resoption = self.ParameterDict[self.resoption.Name] = intParameter(
             "Reservoir Model",
             DefaultValue=ReservoirModel.ANNUAL_PERCENTAGE,
-            AllowableRange=[0, 1, 2, 3, 4, 5, 6, 7],
+            AllowableRange=[0, 1, 2, 3, 4, 5, 6, 7, 8],
             Required=True,
             ErrMessage="run default reservoir model (Thermal Drawdown Percentage Model)",
             ToolTipText="0: Cylindrical model, 1: Multiple parallel fractures model, 2: 1D linear heat sweep model,  \
             3: m/a single fracture drawdown model, 4: Linear thermal drawdown model, \
-            5: Generic user-provided temperature profile, 6: TOUGH2, 7: SUTRA"
+            5: Generic user-provided temperature profile, 6: TOUGH2, 7: SUTRA, 8: Slender Body Theory (SBT)"
         )
 
         self.depth = self.ParameterDict[self.depth.Name] = floatParameter(
@@ -580,6 +580,9 @@ class Reservoir:
                         elif ParameterReadIn.sValue == '7':
                             # SUTRA Simulator
                             ParameterToModify.value = ReservoirModel.SUTRA
+                        elif ParameterReadIn.sValue == '8':
+                            # SBT Simulator
+                            ParameterToModify.value = ReservoirModel.SBT
 
                     elif ParameterToModify.Name == 'Reservoir Depth':
                         # FIXME TODO only convert if current units are km

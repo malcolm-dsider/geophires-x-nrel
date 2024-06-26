@@ -41,6 +41,7 @@ class ReservoirModel(str, Enum):
     USER_PROVIDED_PROFILE = "User-Provided Temperature Profile"
     TOUGH2_SIMULATOR = "TOUGH2 Simulator"
     SUTRA = "SUTRA"
+    SBT = "Slender Body Theory"
 
 
 class ReservoirVolume(str, Enum):
@@ -92,3 +93,13 @@ class Configuration(str, Enum):
     COAXIAL = "coaxial"
     VERTICAL = "vertical"
     L = "L"
+
+
+class FlowrateModel(str, Enum):
+    USER_SUPPLIED = "user supplied"
+    FILE_SUPPLIED = "file supplied"
+
+
+class InjectionTemperatureModel(str, Enum):
+    USER_SUPPLIED = "user supplied"
+    FILE_SUPPLIED = "file supplied"

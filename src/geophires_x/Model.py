@@ -8,6 +8,8 @@ from geophires_x.EconomicsS_DAC_GT import EconomicsS_DAC_GT
 from geophires_x.GeoPHIRESUtils import read_input_file
 from geophires_x.OutputsAddOns import OutputsAddOns
 from geophires_x.OutputsS_DAC_GT import OutputsS_DAC_GT
+from geophires_x.SBTWellbores import SBTWellbores
+from geophires_x.SBTReservoir import SBTReservoir
 from geophires_x.TDPReservoir import TDPReservoir
 from geophires_x.WellBores import WellBores
 from geophires_x.SurfacePlant import SurfacePlant
@@ -21,7 +23,7 @@ from geophires_x.SurfacePlantDistrictHeating import SurfacePlantDistrictHeating
 from geophires_x.SurfacePlantHeatPump import SurfacePlantHeatPump
 from geophires_x.Economics import Economics
 from geophires_x.Outputs import Outputs
-from geophires_x.OptionList import EndUseOptions, PlantType
+from geophires_x.OptionList import EndUseOptions, PlantType, ReservoirModel
 from geophires_x.CylindricalReservoir import CylindricalReservoir
 from geophires_x.MPFReservoir import MPFReservoir
 from geophires_x.LHSReservoir import LHSReservoir
@@ -101,6 +103,8 @@ class Model(object):
                 self.reserv: TOUGH2Reservoir = TOUGH2Reservoir(self)  # Tough2 is called
             elif self.InputParameters['Reservoir Model'].sValue == '7':
                 self.reserv: SUTRAReservoir = SUTRAReservoir(self)  # SUTRA output is created
+            elif self.InputParameters['Reservoir Model'].sValue == '8':
+                self.reserv: SBTReservoir = SBTReservoir(self)  # SBT output is created
 
         # initialize the default objects
         self.wellbores: WellBores = WellBores(self)
@@ -127,9 +131,15 @@ class Model(object):
                 # If we are doing AGS, we need to replace the various objects we with versions of the objects
                 # that have AGS functionality.
                 # that means importing them, initializing them, then reading their parameters
-                # use the simple cylindrical reservoir for all AGS systems.
-                self.reserv: CylindricalReservoir = CylindricalReservoir(self)
-                self.wellbores: WellBores = AGSWellBores(self)
+                # use the simple cylindrical reservoir or SBT for all AGS systems.
+
+                if 'Reservoir Model' in self.InputParameters:
+                    if self.InputParameters['Reservoir Model'].sValue == '8': # we are using an SBT Reservoir Model
+                        self.reserv: SBTReservoir = SBTReservoir(self)
+                        self.wellbores: WellBores = SBTWellbores(self)
+                if not isinstance(self.reserv, SBTReservoir):
+                    self.reserv: CylindricalReservoir = CylindricalReservoir(self) # if we don't want SBT, then we must use CylindricalReservoir
+                    self.wellbores: WellBores = AGSWellBores(self)
                 self.surfaceplant: SurfacePlantAGS = SurfacePlantAGS(self)
                 self.economics: AGSEconomics = AGSEconomics(self)
                 self.outputs: AGSOutputs = AGSOutputs(self, output_file=output_file)

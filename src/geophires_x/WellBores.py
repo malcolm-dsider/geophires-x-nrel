@@ -951,6 +951,61 @@ class WellBores:
             ErrMessage="assume default for Number of Nonvertical Wellbore Sections (1)",
             ToolTipText="Number of Nonvertical Wellbore Sections"
         )
+        self.vertical_wellbore_spacing = self.ParameterDict[self.vertical_wellbore_spacing.Name] = floatParameter(
+            'Vertical Wellbore Spacing',
+            DefaultValue=100.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Vertical Wellbore Spacing (100.0 meters)',
+            ToolTipText='Horizontal distance between vertical wellbores'
+        )
+        self.lateral_spacing = self.ParameterDict[self.lateral_spacing.Name] = floatParameter(
+            'Lateral Spacing',
+            DefaultValue=100.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Lateral Spacing (100.0 meters)',
+            ToolTipText='Horizontal distance between laterals'
+        )
+        self.lateral_inclination_angle = self.ParameterDict[self.lateral_inclination_angle.Name] = floatParameter(
+            'Lateral Inclination Angle',
+            DefaultValue=20.0,
+            Min=0.0,
+            Max=89.999999,
+            UnitType=Units.ANGLE,
+            PreferredUnits=AngleUnit.DEGREES,
+            CurrentUnits=AngleUnit.DEGREES,
+            ErrMessage='assume default for Lateral Inclination Angle (20.0 degrees)',
+            ToolTipText='Inclination of the lateral section, where 0 degrees would mean vertical while 90 degrees is pure horizontal'
+        )
+        self.element_length = self.ParameterDict[self.element_length.Name] = floatParameter(
+            'Discretization Length',
+            DefaultValue=150.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Discretization Length (2000.0 meters)',
+            ToolTipText='length of the geometry discretization'
+        )
+        self.junction_depth = self.ParameterDict[self.junction_depth.Name] = floatParameter(
+            'Junction Depth',
+            DefaultValue=4000.0,
+            Min=1000,
+            Max=15000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Junction Depth (4000.0 meters)',
+            ToolTipText='vertical depth where the different laterals branch out'
+        )
         self.NonverticalsCased = self.ParameterDict[self.NonverticalsCased.Name] = boolParameter(
             "Multilaterals Cased",
             DefaultValue=False,

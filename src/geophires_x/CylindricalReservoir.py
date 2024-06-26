@@ -258,3 +258,7 @@ class CylindricalReservoir(Reservoir):
 
         return quantity(static_pressure_MPa(self.rhorock.quantity().to('kg/m**3').magnitude,
                                             self.InputDepth.quantity().to('m').magnitude), 'MPa')
+
+    def hydrostatic_pressure(self) -> PlainQuantity:
+        return quantity(static_pressure_MPa(10000.0,
+                                            self.InputDepth.quantity().to('m').magnitude), 'MPa')

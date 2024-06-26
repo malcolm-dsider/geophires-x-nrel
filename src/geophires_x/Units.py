@@ -19,6 +19,7 @@ class Units(IntEnum):
     NONE = auto()
     CHOICE = auto()
     LENGTH = auto()
+    ANGLE = auto()
     AREA = auto()
     VOLUME = auto()
     MASS = auto()
@@ -58,8 +59,15 @@ class Units(IntEnum):
     POWERPERUNITAREA = auto()
     HEATPERUNITVOLUME = auto()
     POWERPERUNITVOLUME = auto()
-    DECAY_RATE=auto()
-    INFLATION_RATE=auto()
+    DECAY_RATE = auto()
+    INFLATION_RATE = auto()
+    DYNAMIC_VISCOSITY = auto()
+
+
+class AngleUnit(str, Enum):
+    """Temperature Units"""
+    DEGREES = "degrees"
+    RADIANS = "radians"
 
 
 class TemperatureUnit(str, Enum):
@@ -350,3 +358,8 @@ class Decay_RateUnit(str,Enum):
 class Inflation_RateUnit(str,Enum):
     """Decay rate Units"""
     KPASCALPERYEAR = "kPa/yr"
+
+
+class Dynamic_ViscosityUnit(str,Enum):
+    """Decay rate Units"""
+    PASCALSEC = "PaSec"

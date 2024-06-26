@@ -1,3 +1,5 @@
+import numpy as np
+
 from geophires_x.SurfacePlant import SurfacePlant
 import geophires_x.Model as Model
 
