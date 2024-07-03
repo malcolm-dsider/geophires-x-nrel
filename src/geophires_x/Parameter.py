@@ -1,4 +1,6 @@
 # copyright, 2023, Malcolm I Ross
+from __future__ import annotations
+
 import copy
 import dataclasses
 
@@ -12,6 +14,8 @@ from forex_python.converter import CurrencyRates, CurrencyCodes
 from abc import ABC
 
 from pint.facets.plain import PlainQuantity
+
+from geophires_x.OptionList import GeophiresInputEnum
 from geophires_x.Units import *
 
 _ureg = get_unit_registry()
@@ -119,10 +123,11 @@ class Parameter(HasQuantity):
 
     parameter_category: str = None
 
+    ValuesEnum:GeophiresInputEnum = None
+
     def __post_init__(self):
         if self.PreferredUnits is None:
             self.PreferredUnits = self.CurrentUnits
-
 
 @dataclass
 class boolParameter(Parameter):
@@ -164,6 +169,11 @@ class intParameter(Parameter):
     DefaultValue: int = value
     AllowableRange: List[int] = field(default_factory=list)
     json_parameter_type: str = 'integer'
+
+    def coerce_value_to_enum(self):
+        if self.ValuesEnum is not None:
+            if not isinstance(self.value, self.ValuesEnum):
+                self.value = self.ValuesEnum.from_int(self.value)
 
 
 @dataclass
@@ -813,8 +823,6 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
     ConvertOutputUnits Given an output parameter, convert the value(s) from what they contain
     (as calculated by GEOPHIRES) to what the user specified as what they want for outputs.  Conversion happens inline.
 
-    TODO switch to pint-based conversion like in ConvertUnitsBack
-
     :param oparam: The parameter you want to be converted (value or list of values).  Because Parameters know the
         PreferredUnits and CurrentUnits, this routine knows what to do. It will convert the value(s) in the parameter
         to the new units, and then reset the CurrentUnits to the new units. This is done so that the user can see the units
@@ -830,6 +838,16 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
     :type model: :class:`~geophires_x.Model.Model`
     :return: None
     """
+
+    try:
+        oparam.value = _ureg.Quantity(oparam.value, oparam.CurrentUnits.value).to(newUnit.value).magnitude
+        oparam.CurrentUnits = newUnit
+        return
+    except AttributeError as ae:
+        # TODO refactor to check for/convert currency instead of relying on try/except once currency conversion is
+        #  re-enabled - https://github.com/NREL/GEOPHIRES-X/issues/236?title=Currency+conversions+disabled
+        model.logger.warning(f'Failed to convert units with pint, falling back to legacy conversion code ({ae})')
+
     if isinstance(oparam.value, str):
         return  # strings have no units
     elif isinstance(oparam.value, bool):
@@ -837,96 +855,20 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
     DefUnit, UnitSystem = LookupUnits(str(newUnit.value))
 
     if UnitSystem not in [Units.CURRENCY, Units.CURRENCYFREQUENCY, Units.COSTPERMASS, Units.ENERGYCOST]:
-        if isinstance(oparam.value, float) or isinstance(oparam.value, int):
-            # this is a simple unit conversion: it could be just units (meters->feet) or simple currency ($->EUR)
-            # or compound Currency (MUSD-EUR)
-            try:
-                fromQ = _ureg.Quantity(
-                    oparam.value, str(oparam.PreferredUnits.value)
-                )  # Make a Pint Quantity out of the value
-                toQ = _ureg.Quantity(0, str(newUnit.value))  # Make a Pint Quantity out of the new value
-            except BaseException as ex:
-                print(str(ex))
-                msg = (
+        msg = (
                     "Warning: GEOPHIRES failed to initialize your units for "
                     + oparam.Name
                     + " to something it understands. You gave "
                     + str(newUnit.value)
-                    + " - Are the units defined for Pint"
-                    + " library, or have you defined them in the user defined units file (GEOPHIRES3_newunits)?"
+                    + " -Are the units defined for"
+                    + " Pint library, or have you defined them in the user defined units file (GEOPHIRES3_newunits)?"
                     + " Continuing without output conversion."
                 )
-                print(msg)
-                model.logger.warning(str(ex))
-                model.logger.warning(msg)
-                return
-            try:
-                toQ = fromQ.to(toQ)  # update The quantity to the units that the user wanted
-            except BaseException as ex:
-                print(str(ex))
-                msg = (
-                    "Warning: GEOPHIRES failed to convert your units for "
-                    + oparam.Name
-                    + " to something it understands. You gave "
-                    + str(newUnit.value)
-                    + " - Are the units defined for Pint"
-                    + " library, or have you defined them in the user defined units file (GEOPHIRES3_newunits)?"
-                    + " Continuing without output conversion."
-                )
-                print(msg)
-                model.logger.warning(str(ex))
-                model.logger.warning(msg)
-                return
-            # reset the value and current units
-            oparam.value = toQ.magnitude
-            oparam.CurrentUnits = newUnit
+        print(msg)
+        model.logger.warning(msg)
+        return
 
-        elif isinstance(oparam.value, array):  # handle the array case
-            i = 0
-            for arrayval in oparam.value:
-                try:
-                    fromQ = _ureg.Quantity(
-                        oparam.value[i], str(oparam.PreferredUnits.value)
-                    )  # Make a Pint Quantity out of from the value
-                    toQ = _ureg.Quantity(0, str(newUnit.value))  # Make a Pint Quantity out of the new value
-                except BaseException as ex:
-                    print(str(ex))
-                    msg = (
-                        "Warning: GEOPHIRES failed to initialize your units for "
-                        + oparam.Name
-                        + " to something it understands. You gave "
-                        + str(newUnit.value)
-                        + " -Are the units defined for"
-                        + " Pint library, or have you defined them in the user defined units file (GEOPHIRES3_newunits)?"
-                        + " Continuing without output conversion."
-                    )
-                    print(msg)
-                    model.logger.warning(str(ex))
-                    model.logger.warning(msg)
-                    return
-                try:
-                    toQ = fromQ.to(toQ)  # update The quantity to the units that the user wanted
-                except BaseException as ex:
-                    print(str(ex))
-                    msg = (
-                        "Warning: GEOPHIRES failed to convert your units for "
-                        + oparam.Name
-                        + " to something it understands. You gave "
-                        + str(newUnit.value)
-                        + " - Are the units defined for Pint library, or have you defined them in the user defined"
-                        + " units file (GEOPHIRES3_newunits)?    continuing without output conversion."
-                    )
-                    print(msg)
-                    model.logger.warning(str(ex))
-                    model.logger.warning(msg)
-                    return
-
-                # reset the value and current units
-                oparam.value[i] = toQ.magnitude
-                oparam.CurrentUnits = newUnit
-                i = i + 1
-
-    else:  # must be a currency thing.
+    else:
         prefType = oparam.PreferredUnits.value
         currType = newUnit.value
 
@@ -1022,10 +964,10 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
             print(str(ex))
 
             msg = (
-                f'Error: GEOPHIRES failed to convert your currency for {oparam.Name} to something it understands.'
-                f'You gave {currType} - conversion may be affected by https://github.com/NREL/GEOPHIRES-X/issues/236.  '
+                f'Error: GEOPHIRES failed to convert your currency for {oparam.Name} to something it understands. '
+                f'You gave {currType} - conversion may be affected by https://github.com/NREL/GEOPHIRES-X/issues/236. '
                 f'Please change your units to {oparam.PreferredUnits.value} '
-                f'to continue. Cannot continue unless you do.  Exiting.'
+                f'to continue. Cannot continue unless you do. Exiting.'
             )
 
             print(msg)
@@ -1038,3 +980,17 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
         oparam.value = Factor * conv_rate * float(oparam.value)
         oparam.CurrentUnits = DefUnit
         model.logger.info(f'Complete {str(__name__)}: {sys._getframe().f_code.co_name}')
+
+
+
+def coerce_int_params_to_enum_values(parameter_dict:dict[str,Parameter]) -> None:
+    """
+    Some modules have intParameters with an int default value whose working value gets set to an
+    enum when the parameter is read. If the parameter is not provided as an input, the default int value needs to
+    be coerced into the corresponding enum value.
+    TODO: resolve these enum/int value discrepancies so this workaround can be removed
+    """
+
+    for param_name, param in parameter_dict.items():
+        if isinstance(param, intParameter):
+            parameter_dict[param_name].coerce_value_to_enum()
