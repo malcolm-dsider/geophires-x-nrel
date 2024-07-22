@@ -331,7 +331,7 @@ class HIP_RA_X:
         self.recoverable_rock_heat: Parameter = parameter_dict_entry(
             floatParameter(
                 'Recoverable Heat from Rock',
-                value=0.75,
+                value=0.35,
                 Min=0.00,
                 Max=1.000,
                 UnitType=Units.PERCENT,
