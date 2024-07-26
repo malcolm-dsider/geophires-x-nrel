@@ -404,7 +404,7 @@ class HIP_RA:
             CurrentUnits=TimeUnit.YEAR,
             AllowableRange=list(range(1, 101, 1)),
             Required=True,
-            ErrMessage='assume default Reservoir Life Cycle (25 years)',
+            ErrMessage='assume default Reservoir Life Cycle (30 years)',
             ToolTipText='Reservoir Life Cycle [30 years]',
         )
 
