@@ -1,0 +1,8 @@
+Reservoir Temperature, 310
+Rejection Temperature, 165.0
+Reservoir Porosity, 7.0
+Reservoir Area, 23.95
+Reservoir Thickness, 0.7
+Reservoir Life Cycle, 25
+Reservoir Pressure, 6.37
+Density Of Reservoir Rock, 2.600e12

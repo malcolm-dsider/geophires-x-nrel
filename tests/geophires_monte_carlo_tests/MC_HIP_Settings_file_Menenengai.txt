@@ -1,0 +1,8 @@
+INPUT, Reservoir Temperature, triangular, 290, 310, 330
+INPUT, Reservoir Area, triangular, 10, 23.95, 37.9
+INPUT, Reservoir Thickness, triangular, 0.4, 0.7, 1.0
+INPUT, Reservoir Pressure, triangular, 4.9, 6.37, 7.85
+INPUT, Density Of Reservoir Rock, triangular, 2.550e12, 2.600e12, 2.650e12
+OUTPUT, Producible Electricity (reservoir)
+ITERATIONS, 10000
+HTML_PATH, D:\temp\menenengai.html
