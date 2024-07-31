@@ -51,6 +51,84 @@ class SBTWellbores(WellBores):
         # NB: inputs we already have ("already have it") need to be set at ReadParameter time so values are set at the
         # last possible time
 
+        self.vertical_section_length = self.ParameterDict[self.vertical_section_length.Name] = floatParameter(
+            'Vertical Section Length',
+            DefaultValue=2000.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Vertical Section Length (2000.0 meters)',
+            ToolTipText='length/depth to the bottom of the vertical wellbores'
+        )
+        self.vertical_wellbore_spacing = self.ParameterDict[self.vertical_wellbore_spacing.Name] = floatParameter(
+            'Vertical Wellbore Spacing',
+            DefaultValue=100.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Vertical Wellbore Spacing (100.0 meters)',
+            ToolTipText='Horizontal distance between vertical wellbores'
+        )
+        self.lateral_spacing = self.ParameterDict[self.lateral_spacing.Name] = floatParameter(
+            'Lateral Spacing',
+            DefaultValue=100.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Lateral Spacing (100.0 meters)',
+            ToolTipText='Horizontal distance between laterals'
+        )
+        self.lateral_inclination_angle = self.ParameterDict[self.lateral_inclination_angle.Name] = floatParameter(
+            'Lateral Inclination Angle',
+            DefaultValue=20.0,
+            Min=0.0,
+            Max=89.999999,
+            UnitType=Units.ANGLE,
+            PreferredUnits=AngleUnit.DEGREES,
+            CurrentUnits=AngleUnit.DEGREES,
+            ErrMessage='assume default for Lateral Inclination Angle (20.0 degrees)',
+            ToolTipText='Inclination of the lateral section, where 0 degrees would mean vertical while 90 degrees is pure horizontal'
+        )
+        self.element_length = self.ParameterDict[self.element_length.Name] = floatParameter(
+            'Discretization Length',
+            DefaultValue=150.0,
+            Min=0.01,
+            Max=10000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Discretization Length (2000.0 meters)',
+            ToolTipText='length of the geometry discretization'
+        )
+        self.junction_depth = self.ParameterDict[self.junction_depth.Name] = floatParameter(
+            'Junction Depth',
+            DefaultValue=4000.0,
+            Min=1000,
+            Max=15000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Junction Depth (4000.0 meters)',
+            ToolTipText='vertical depth where the different laterals branch out (where the multilateral section starts, second deepest depth of model)'
+        )
+        self.lateral_endpoint_depth = self.ParameterDict[self.lateral_endpoint_depth.Name] = floatParameter(
+            'Lateral Endpoint Depth',
+            DefaultValue=7000.0,
+            Min=1000,
+            Max=15000.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS,
+            ErrMessage='assume default for Lateral Endpoint Depth (7000.0 meters)',
+            ToolTipText='vertical depth where the lateral section ends (tip of the multilateral section, deepest depth of model)'
+        )
+
         model.logger.info(f'complete {__class__!s}: {sys._getframe().f_code.co_name}')
 
     def __str__(self):
@@ -94,17 +172,7 @@ class SBTWellbores(WellBores):
         """
         model.logger.info(f'Init {__class__!s}: {sys._getframe().f_code.co_name}')
         self.Tini = np.max(model.reserv.Tresoutput.value)  # initial temperature of the reservoir
-
-        # Calculate the temperature drop as the fluid makes it way to the surface (or use a constant value)
-        # if not Ramey, hard code a user-supplied temperature drop.
-        self.ProdTempDrop.value = self.tempdropprod.value
-        model.reserv.cpwater.value = heat_capacity_water_J_per_kg_per_K(
-            np.average(model.reserv.Tresoutput.value),
-            pressure=model.reserv.hydrostatic_pressure()
-        )
-#        self.ProducedTemperature.value = [0.0] * len(model.reserv.Tresoutput.value)  # initialize the array
-#        self.ProducedTemperature.value = model.reserv.Tresoutput.value - self.ProdTempDrop.value
-        self.ProducedTemperature.value = np.ndarray(model.reserv.Tresoutput.value.copy())
+        self.ProducedTemperature.value = np.array(model.reserv.Tresoutput.value)
 
         # Now use the parent's calculation to calculate the upgoing and downgoing pressure drops and pumping power
         self.PumpingPower.value = [0.0] * len(self.ProducedTemperature.value)  # initialize the array
@@ -125,19 +193,19 @@ class SBTWellbores(WellBores):
                                                                                    self.prodwellflowrate.value,
                                                                                    self.prodwelldiam.value,
                                                                                    self.impedancemodelused.value,
-                                                                                   model.reserv.InputDepth.value)
+                                                                                   self.vertical_section_length.value)
             if self.impedancemodelused.value:  # assumed everything stays liquid throughout
                 self.DPOverall.value, UpgoingPumpingPower, self.DPProdWell.value, self.DPReserv.value, self.DPBouyancy.value = \
                     ProdPressureDropsAndPumpingPowerUsingImpedenceModel(
                         f3, vprod,
                         self.rhowaterinj, self.rhowaterprod,
-                        self.rhowaterprod, model.reserv.InputDepth.value, self.prodwellflowrate.value,
+                        self.rhowaterprod,self.vertical_section_length.value, self.prodwellflowrate.value,
                         self.prodwelldiam.value, self.impedance.value,
                         self.nprod.value, model.reserv.waterloss.value, model.surfaceplant.pump_efficiency.value)
                 self.DPOverall.value, DowngoingPumpingPower, self.DPProdWell.value, self.DPReserv.value, self.DPBouyancy.value = \
                     ProdPressureDropsAndPumpingPowerUsingImpedenceModel(
                         f3, vprod,
-                        self.rhowaterprod, self.rhowaterinj, self.rhowaterprod, model.reserv.InputDepth.value,
+                        self.rhowaterprod, self.rhowaterinj, self.rhowaterprod, self.vertical_section_length.value,
                         self.prodwellflowrate.value, self.injwelldiam.value, self.impedance.value,
                         self.nprod.value, model.reserv.waterloss.value, model.surfaceplant.pump_efficiency.value)
 
@@ -146,7 +214,7 @@ class SBTWellbores(WellBores):
                     ProdPressureDropAndPumpingPowerUsingIndexes(
                         model, self.productionwellpumping.value,
                         self.usebuiltinppwellheadcorrelation,
-                        model.reserv.Trock.value, model.reserv.InputDepth.value,
+                        model.reserv.Trock.value, self.vertical_section_length.value,
                         self.ppwellhead.value, self.PI.value,
                         self.prodwellflowrate.value, f3, vprod,
                         self.prodwelldiam.value, self.nprod.value, model.surfaceplant.pump_efficiency.value,
@@ -155,51 +223,25 @@ class SBTWellbores(WellBores):
                 DowngoingPumpingPower, ppp2, dppw, ppwh = ProdPressureDropAndPumpingPowerUsingIndexes(
                     model, self.productionwellpumping.value,
                     self.usebuiltinppwellheadcorrelation,
-                    model.reserv.Trock.value, model.reserv.InputDepth.value,
+                    model.reserv.Trock.value, self.vertical_section_length.value,
                     self.ppwellhead.value, self.PI.value,
                     self.prodwellflowrate.value, f3, vprod,
                     self.injwelldiam.value, self.nprod.value, model.surfaceplant.pump_efficiency.value,
                     self.rhowaterinj)
 
             # Calculate Nonvertical Pressure Drop
-
-#            self.al = 365.0 / 4.0 * model.economics.timestepsperyear.value
-
             # TODO assume no pressure drop in the non-vertical section for now
             NonverticalPumpingPower = [0.0] * len(DowngoingPumpingPower)  # initialize the array
             self.NonverticalPressureDrop.value = [0.0] * len(DowngoingPumpingPower)  # initialize the array
             NonverticalPumpingPower = [0.0] * len(DowngoingPumpingPower)  # initialize the array
-#            self.NonverticalPressureDrop.value, f3 = self.CalculateNonverticalPressureDrop(
-#                model,
-#                model.reserv.timevector.value,
-#                np.max(model.reserv.timevector.value),
-#                self.time_operation.value,
-#                self.time_max,
-#                self.al)
-
-            # calculate nonvertical well pumping power needed[MWe]
-            #NonverticalPumpingPower = self.NonverticalPressureDrop.value * self.nprod.value * \
-            #                          self.prodwellflowrate.value / self.rhowaterprod / \
-            #                          model.surfaceplant.pump_efficiency.value / 1E3  # [MWe] total pumping power for nonvertical section
-            NonverticalPumpingPower = np.array(
-                [0. if x < 0. else x for x in NonverticalPumpingPower])  # cannot be negative so set to 0
 
             # recalculate the pumping power by looking at the difference between the upgoing and downgoing and the nonvertical
-            self.PumpingPower.value = DowngoingPumpingPower + NonverticalPumpingPower - UpgoingPumpingPower
+            self.PumpingPower.value = np.array(DowngoingPumpingPower) + np.array(NonverticalPumpingPower) - np.array(UpgoingPumpingPower)
             self.PumpingPower.value = [max(x, 0.) for x in self.PumpingPower.value]  # cannot be negative, so set to 0
 
-        # calculate water values based on initial temperature
-
-        rho_water = density_water_kg_per_m3(
-            self.ProducedTemperature.value[0],
-            pressure = model.reserv.lithostatic_pressure(),
-        )
-
-
-        model.reserv.cpwater.value = heat_capacity_water_J_per_kg_per_K(
-            self.ProducedTemperature.value[0],
-            pressure=model.reserv.hydrostatic_pressure(),
-        )  # Need this for surface plant output calculation
+        # calculate water values based on initial temperature, Need this for surface plant output calculation
+        rho_water = density_water_kg_per_m3(np.average(self.ProducedTemperature.value), model.reserv.lithostatic_pressure())
+        model.reserv.cpwater.value = heat_capacity_water_J_per_kg_per_K(np.average(self.ProducedTemperature.value), model.reserv.hydrostatic_pressure(),)
 
         # set pumping power to zero for all times, assuming that the thermosphere wil always
         # make pumping of working fluid unnecessary

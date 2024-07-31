@@ -9,8 +9,7 @@ import matplotlib.pyplot as plt
 
 import geophires_x.Model as Model
 from .CylindricalReservoir import CylindricalReservoir
-from .OptionList import FlowrateModel, InjectionTemperatureModel, \
-    Configuration
+from .OptionList import FlowrateModel, InjectionTemperatureModel, Configuration
 from .Parameter import intParameter, floatParameter, OutputParameter, ReadParameter, strParameter
 from .Reservoir import Reservoir
 from .Units import *
@@ -39,8 +38,8 @@ def interpolator(time_value: float, times: np.ndarray, values: np.ndarray) -> fl
 
 
 def generate_wireframe_model(lateral_endpoint_depth: float, number_of_laterals: int, lateral_spacing: float, element_length: float,
-                             junction_depth:float, vertical_section_depth: float = 2000, angle: float = 20 * np.pi / 180,
-                             vertical_well_spacing: float = 100, generate_graphics: bool = False) -> tuple:
+                             junction_depth:float, vertical_section_depth: float, angle: float,
+                             vertical_well_spacing: float, generate_graphics: bool = False) -> tuple:
 
     # Generate inj well profile
     zinj = np.linspace(0, -vertical_section_depth, round(vertical_section_depth / element_length))
@@ -150,7 +149,8 @@ def generate_wireframe_model(lateral_endpoint_depth: float, number_of_laterals: 
         ax.view_init(az, el)
         plt.show()
 
-    return (xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat)
+    return xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat
+
 
 class SBTReservoir(CylindricalReservoir):
     """
@@ -235,7 +235,7 @@ class SBTReservoir(CylindricalReservoir):
             PreferredUnits=PercentUnit.TENTH,
             ErrMessage="assume default percent implicit (1.0)",
             ToolTipText="Should be between 0 and 1. Most stable is setting it to 1 which results in \
-            a fully implicit Euler scheme when calculting the fluid temperature at each time step. \
+            a fully implicit Euler scheme when calculating the fluid temperature at each time step. \
             With a value of 0, the convective term is modelled using explicit Euler. \
             A value of 0.5 would model the convective term 50% explicit and 50% implicit, \
             which may be slightly more accurate than fully implicit."
@@ -321,7 +321,7 @@ class SBTReservoir(CylindricalReservoir):
         """
         model.logger.info(f'Init {str(__class__)}: {sys._getframe().f_code.co_name}')
 
-        if model.wellbores.Configuration.value == Configuration.ULOOP:
+        if model.wellbores.Configuration.value in [Configuration.ULOOP, Configuration.EAVORLOOP]:
             self.Calculate_Uloop(model)
         elif model.wellbores.Configuration.value == Configuration.COAXIAL:
             self.Calculate_Coaxial(model)
@@ -1060,14 +1060,16 @@ class SBTReservoir(CylindricalReservoir):
         """
         model.logger.info(f'Init {str(__class__)}: {sys._getframe().f_code.co_name}')
         self.averagegradient.value = self.gradient.value[0]
-        self.Trock.value = self.Tsurf.value + (self.gradient.value[0] * (self.InputDepth.value * 1000.0))
+        self.Trock.value = self.Tsurf.value + (self.gradient.value[0] * model.wellbores.lateral_endpoint_depth.value)
 
         lateralflowallocation = []
         for i in range(model.wellbores.numnonverticalsections.value):
             lateralflowallocation.append(1 / model.wellbores.numnonverticalsections.value)
-            #20 is the plantlifetime
-            #interpolate- but consider ignoring the first step.
-        times = np.concatenate((np.linspace(0,9900,100), np.logspace(np.log10(100*100), np.log10(20*365*24*3600), 75))) #simulation times [s] (must start with 0; to obtain smooth results, abrupt changes in time step size should be avoided. logarithmic spacing is recommended)
+            # interpolate time steps - but consider ignoring the first step.
+            # simulation times [s] (must start with 0; to obtain smooth results,
+            # abrupt changes in time step size should be avoided. logarithmic spacing is recommended)
+        times = np.concatenate((np.linspace(0,9900,100), np.logspace(np.log10(100*100),
+                                np.log10(model.surfaceplant.plant_lifetime.value * 365 * 24 * 3600), 75)))
         # Note 1: When providing a variable injection temperature or flow rate, a finer time grid should be considered. Below is one with long term time steps of about 36 days.
         # times = [0] + list(range(100, 10000, 100)) + list(np.logspace(np.log10(100*100), np.log10(0.1*365*24*3600), 40)) + list(np.arange(0.2*365*24*3600, 20*365*24*3600, 0.1*365*24*3600))
         # Note 2: To capture the start-up effects, several small time steps are taken during the first 10,000 seconds in the time vector considered. To speed up the simulation, this can be avoided with limited impact on the long-term results. For example, an alternative time vector would be:
@@ -1111,17 +1113,15 @@ class SBTReservoir(CylindricalReservoir):
 #                                                                                           2000, 20 * np.pi / 180, 100,
 #                                                                                           True)
 
-        xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat = generate_wireframe_model(self.wellbore.lateral_endpoint_depth.value,
+        xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat = generate_wireframe_model(model.wellbores.lateral_endpoint_depth.value,
                                                                                            model.wellbores.numnonverticalsections.value,
                                                                                            model.wellbores.lateral_spacing.value,
                                                                                            model.wellbores.element_length.value,
                                                                                            model.wellbores.junction_depth.value,
-                                                                                           self.InputDepth.value * 1000,
+                                                                                           model.wellbores.vertical_section_length.value,
                                                                                            model.wellbores.lateral_inclination_angle.value * np.pi / 180.0,
                                                                                            model.wellbores.vertical_wellbore_spacing.value,
                                                                                            True)
-
-#        xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat = generate_wireframe_model(7000, 3, 100, 150, 4000, 2000, 20 * np.pi / 180, 100, True)
 
         # Merge x-, y-, and z-coordinates
         x = np.concatenate((xinj, xprod))
@@ -1722,7 +1722,7 @@ class SBTReservoir(CylindricalReservoir):
             # Calculating the fluid outlet temperature at the top of the first element
             top_element_index = len(xinj) + len(xprod) - 3
             self.Tresoutput.value[i] = Twprevious[top_element_index] + (Twprevious[top_element_index] - Twprevious[top_element_index - 1]) * 0.5
-            print(self.Tresoutput.value[i])
+            print(times[i] / 3.154e+7, ',', self.Tresoutput.value[i])
 
         # Save the nonlinear Time results as 2D array Output Parameter
         self.NonLinearTime_temperature.value = np.column_stack((times, self.Tresoutput.value))
@@ -1736,10 +1736,18 @@ class SBTReservoir(CylindricalReservoir):
         times_years[0] = 0.0  # Ensure the first time step is 0.0
         times_years[-1] = model.surfaceplant.plant_lifetime.value  # Ensure the last time step is the plant lifetime
 
-        linear_values = []
-        # the first element of self.Tresoutput.value is artificially set. replace it with the second value.
-        self.Tresoutput.value [0] = self.Tresoutput.value[1]
+        # Calculate the maximum temperature for the SBT output.
+        max_temperature = np.max(self.Tresoutput.value)
 
+        # Replace the first year of values in the SBT output array
+        # with the maximum temperature for the first year of the SBT output.
+        # This moderates the behavior for the first few months of the SBT output.
+        i = 0
+        while times_years[i] < 1.0:
+            self.Tresoutput.value[i] = max_temperature
+            i = i + 1
+
+        linear_values = []
         # interpolate the values of self.Tresoutput.value to the linear time array
         for t in self.timevector.value:
             linear_values.append(interpolator(t, times_years, self.Tresoutput.value))
