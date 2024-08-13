@@ -296,7 +296,7 @@ def ReadParameter(ParameterReadIn: ParameterEntry, ParamToModify, model):
             # existing value (likely, the default value)
             return
 
-        if not (New_val in ParamToModify.AllowableRange):
+        if not (New_val >= ParamToModify.AllowableRange[0] and New_val <= ParamToModify.AllowableRange[-1]):
             # user provided value is out of range, so announce it, leave set to whatever it was set to (default value)
             err_msg = f"Error: Parameter given ({New_val}) for {ParamToModify.Name} outside of valid range."
             print(err_msg)

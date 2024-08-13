@@ -46,6 +46,7 @@ End-Use Efficiency Factor,0.9,				---[-]
 Surface Temperature,20,		  				---[deg.C]
 Ambient Temperature,20,		 				---[deg.C]
 Electricity Rate,0.1,						---Electricity rate for pumping power [$/kWh]
+Power Plant Type, 9
 
 ***FINANCIAL PARAMETERS***
 **************************

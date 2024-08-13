@@ -17,6 +17,7 @@ from rich.table import Table
 import geophires_x
 import geophires_x.Model as Model
 from geophires_x.Economics import Economics
+from geophires_x.WellBores import WellBores
 from geophires_x.Parameter import ConvertUnitsBack, ConvertOutputUnits, LookupUnits, strParameter, boolParameter, \
     OutputParameter, ReadParameter, intParameter
 from geophires_x.OptionList import EndUseOptions, EconomicModel, ReservoirModel, FractureShape, ReservoirVolume, \
@@ -71,7 +72,7 @@ def ShortenArrayToAnnual(array_to_shorten: pd.array, new_length:int, time_steps_
     new_array = np.zeros(new_length)
 
     j = 0
-    for i in range(0, len(array_to_shorten), time_steps_per_year):
+    for i in range(0, len(array_to_shorten)-1, time_steps_per_year):
         new_array[j] = array_to_shorten[i]
         j = j + 1
 
@@ -1483,6 +1484,7 @@ class Outputs:
 
         # Build the data frame to hold the revenue and cashflow profile
         econ: Economics = model.economics
+        wells: Wellbores = model.wellbores
         # create a Coam array and zero out the OPEX during construction years
         construction_years_zeros = np.zeros(model.surfaceplant.construction_years.value)
         Coam = np.zeros(model.surfaceplant.construction_years.value + model.surfaceplant.plant_lifetime.value)
@@ -1593,7 +1595,10 @@ class Outputs:
                 f.write(f'      Number of production wells:                    {model.wellbores.nprod.value:10.0f}'+NL)
                 f.write(f'      Number of injection wells:                     {model.wellbores.ninj.value:10.0f}'+NL)
                 f.write(f'      Flowrate per production well:                    {model.wellbores.prodwellflowrate.value:10.1f} '  + model.wellbores.prodwellflowrate.CurrentUnits.value + NL)
-                f.write(f'      Well depth (or total length, if not vertical):   {model.reserv.depth.value:10.1f} ' +model.reserv.depth.CurrentUnits.value + NL)
+                if model.wellbores.total_drilled_length.value > 0.0 and model.wellbores.Configuration.value in [1,4,5]:
+                    f.write(f'      Well depth (or total length):                    {model.wellbores.total_drilled_length.value:10.1f} ' + model.wellbores.total_drilled_length.CurrentUnits.value + NL)
+                else:
+                    f.write(f'      Well depth:                                      {model.reserv.depth.value:10.1f} ' + model.reserv.depth.CurrentUnits.value + NL)
 
                 if model.reserv.numseg.value == 1:
                     f.write(f'      Geothermal gradient:                                {model.reserv.gradient.value[0]:10.4f} ' + model.reserv.gradient.CurrentUnits.value + NL)
@@ -1643,7 +1648,11 @@ class Outputs:
                 f.write(NL)
                 f.write(f'      Number of Production Wells:                    {model.wellbores.nprod.value:10.0f}' + NL)
                 f.write(f'      Number of Injection Wells:                     {model.wellbores.ninj.value:10.0f}' + NL)
-                f.write(f'      Well depth (or total length, if not vertical):   {model.reserv.depth.value:10.1f} ' + model.reserv.depth.CurrentUnits.value + NL)
+                if model.wellbores.total_drilled_length.value > 0.0 and model.wellbores.Configuration.value in [1,4,5]:
+                    f.write(f'      Well depth (or total length):                    {model.wellbores.total_drilled_length.value:10.1f} ' + model.wellbores.total_drilled_length.CurrentUnits.value + NL)
+                else:
+                    f.write(f'      Well depth:                                      {model.reserv.depth.value:10.1f} ' + model.reserv.depth.CurrentUnits.value + NL)
+
                 f.write(f'      Water loss rate:                                 {model.reserv.waterloss.value*100:10.1f} ' + model.reserv.waterloss.CurrentUnits.value + NL)
                 f.write(f'      Pump efficiency:                                 {model.surfaceplant.pump_efficiency.value * 100:10.1f} ' + model.surfaceplant.pump_efficiency.CurrentUnits.value + NL)
                 f.write(f'      Injection temperature:                           {model.wellbores.Tinj.value:10.1f} ' + model.wellbores.Tinj.CurrentUnits.value + NL)
@@ -1780,10 +1789,15 @@ class Outputs:
                             model.economics.cost_one_injection_well.value != -1:
                         f.write(f'             Drilling and completion costs per production well:   {econ.cost_one_production_well.value:10.2f} ' + econ.cost_one_production_well.CurrentUnits.value + NL)
                         f.write(f'             Drilling and completion costs per injection well:    {econ.cost_one_injection_well.value:10.2f} ' + econ.cost_one_injection_well.CurrentUnits.value + NL)
-                    elif econ.cost_nonvertical_section.value > 0.0:
-                        f.write(f'             Drilling and completion costs per vertical production well:   {econ.cost_one_production_well.value:10.2f} ' + econ.cost_one_production_well.CurrentUnits.value + NL)
-                        f.write(f'             Drilling and completion costs per vertical injection well:    {econ.cost_one_injection_well.value:10.2f} ' + econ.cost_one_injection_well.CurrentUnits.value + NL)
-                        f.write(f'             Drilling and completion costs per non-vertical sections:      {econ.cost_nonvertical_section.value:10.2f} ' + econ.cost_nonvertical_section.CurrentUnits.value + NL)
+                    elif econ.cost_lateral_section.value > 0.0:
+                        length = wells.tot_vert_m.value / (wells.nprod.value + wells.ninj.value)
+                        f.write(f'             Drilling and completion costs per vertical production well ({length:5.0f} {wells.tot_vert_m.CurrentUnits.value}):   {econ.cost_one_production_well.value:10.2f} ' + econ.cost_one_production_well.CurrentUnits.value + NL)
+                        if econ.cost_one_injection_well.value > 0:
+                            length = wells.tot_vert_m.value / (wells.nprod.value + wells.ninj.value)
+                            f.write(f'             Drilling and completion costs per vertical injection well ({length:5.0f} {wells.tot_vert_m.CurrentUnits.value}):    {econ.cost_one_injection_well.value:10.2f} ' + econ.cost_one_injection_well.CurrentUnits.value + NL)
+                        if econ.cost_to_junction_section.value > 0:
+                            f.write(f'             Drilling and completion costs for junction connection section ({wells.tot_to_junction_m.value:5.0f} {wells.tot_to_junction_m.CurrentUnits.value}):{econ.cost_to_junction_section.value:10.2f} ' + econ.cost_to_junction_section.CurrentUnits.value + NL)
+                        f.write(f'             Drilling and completion costs for lateral sections ({wells.tot_lateral_m.value:5.0f} {wells.tot_lateral_m.CurrentUnits.value}):           {econ.cost_lateral_section.value:10.2f} ' + econ.cost_lateral_section.CurrentUnits.value + NL)
                     else:
                         f.write(f'         Drilling and completion costs per well:        {model.economics.Cwell.value/(model.wellbores.nprod.value+model.wellbores.ninj.value):10.2f} ' + model.economics.Cwell.CurrentUnits.value + NL)
                     f.write(f'         Stimulation costs:                             {model.economics.Cstim.value:10.2f} ' + model.economics.Cstim.CurrentUnits.value + NL)

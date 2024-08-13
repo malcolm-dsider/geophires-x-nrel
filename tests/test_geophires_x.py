@@ -75,6 +75,7 @@ class GeophiresXTestCase(BaseTestCase):
                     'Reservoir Depth': 3,
                     'Gradient 1': 50,
                     'Maximum Temperature': 300,
+                    'Power Plant Type': 1,
                 }
             )
         )
@@ -342,6 +343,6 @@ Print Output to Console, 1"""
                 .result['SUMMARY OF RESULTS']['Electricity breakeven price']['value']
             )
 
-        self.assertEqual(9.65, get_fcr_lcoe(0.05))
-        self.assertEqual(3.33, get_fcr_lcoe(0.0001))
-        self.assertEqual(104.74, get_fcr_lcoe(0.8))
+        self.assertEqual(9.87, get_fcr_lcoe(0.05))
+        self.assertEqual(3.39, get_fcr_lcoe(0.0001))
+        self.assertEqual(107.25, get_fcr_lcoe(0.8))

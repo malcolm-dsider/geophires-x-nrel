@@ -41,6 +41,7 @@ Utilization Factor,0.8,			--- [-]
 Surface Temperature,12,			--- [deg.C]
 Ambient Temperature,12,			--- [deg.C]
 End-Use Efficiency Factor,0.8,		--- [-]
+Power Plant Type, 1
 
 District Heating Demand Option,1,					--- Should be 1 or 2. See manual or below for option details
 District Heating Demand File Name,Examples/cornell_heat_demand.csv,		--- hourly MW thermal demand in a CSV file

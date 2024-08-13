@@ -27,7 +27,7 @@ from scipy import signal
 import itertools as itern
 
 from .WellBores import WellBores, RameyCalc, ProdPressureDropAndPumpingPowerUsingIndexes, WellPressureDrop, \
-    ProdPressureDropsAndPumpingPowerUsingImpedenceModel
+    ProdPressureDropsAndPumpingPowerUsingImpedenceModel, calculate_total_drilling_lengths_m
 
 from geophires_x.GeoPHIRESUtils import viscosity_water_Pa_sec
 
@@ -822,11 +822,53 @@ class AGSWellBores(WellBores):
         """
         model.logger.info(f'Init {__class__!s}: {sys._getframe().f_code.co_name}')
 
-        self.Tini = model.reserv.Trock.value  # initialize the temperature to be the initial temperature of the reservoir
+        # initialize the temperature to be the initial temperature of the reservoir
+        self.Tini = model.reserv.Trock.value
+
+
+
+        # Calculate the total length of all drilling
+        if not self.injection_reservoir_depth.Provided:
+            self.injection_reservoir_depth.value = model.reserv.depth.quantity().to('km').magnitude
+        else:
+            self.injection_reservoir_depth.value = self.injection_reservoir_depth.quantity().to('km').magnitude
+
+        if not hasattr(self, 'junction_depth'):
+            # This must be a cylindrical reservoir for CLGS or Wanju method
+            input_vert_depth_km =  model.reserv.InputDepth.quantity().to('km').magnitude
+            output_vert_depth_km = model.reserv.OutputDepth.quantity().to('km').magnitude
+        else:
+            # This must be SBT
+            self.tot_vert_m.value = self.vertical_section_length.quantity().to('km').magnitude
+            input_vert_depth_km = self.vertical_section_length.quantity().to('km').magnitude
+            output_vert_depth_km = self.lateral_endpoint_depth.quantity().to('km').magnitude
+            junction_depth_km = self.junction_depth.quantity().to('km').magnitude
+            angle_rad = ((90.0 * np.pi) / 180) - self.lateral_inclination_angle.quantity().to('radians').magnitude
+
+
+        self.total_drilled_length.value, self.tot_vert_m.value, self.tot_lateral_m.value, self.tot_to_junction_m.value = \
+            calculate_total_drilling_lengths_m(self.Configuration.value,
+                                               self.numnonverticalsections.value,
+                                               self.Nonvertical_length.value / 1000.0,
+                                               input_vert_depth_km,
+                                               output_vert_depth_km,
+                                               self.nprod.value,
+                                               self.ninj.value)
+        self.total_drilled_length.value = self.total_drilled_length.value / 1000.0  # convert to km
+
+
+
+
+
+
+        # decide what sort of AGS model we will use. Default is CLGS, but if the temperature is too high or there are
+        # multiple nonvertical sections, we will use SBT or Wanju code
         if self.Tini > 375.0 or self.numnonverticalsections.value > 1:
             # must be a multilateral setup or too hot for CLGS, so must try to use wanju code.
             if self.Tini > 375.0:
-                msg = 'In AGS, but forced to use Wanju code because initial reservoir temperature is too high for CLGS'
+                msg = 'In AGS, but cannot use CLGS database because initial reservoir temperature is too high for CLGS'
+                msg - msg + ' or the number of nonvertical sections is greater than 1. Switching to SBT,'
+                msg = msg + ' then falling back to Wanju Yuan code as last resort.'
                 model.logger.warning(msg)
                 print(f'Warning: {msg}')
 
@@ -1033,6 +1075,3 @@ class AGSWellBores(WellBores):
             self.PumpingPower.value = [max(x, 0.) for x in self.PumpingPower.value]
 
         model.logger.info(f'complete {str(__class__)}: {sys._getframe().f_code.co_name}')
-
-    def __str__(self):
-        return 'AGSWellBores'

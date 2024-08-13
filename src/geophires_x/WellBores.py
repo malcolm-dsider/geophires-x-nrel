@@ -232,10 +232,11 @@ def InjectionWellPressureDrop(model: Model, Taverage: float, wellflowrate: float
     # start by calculating wellbore fluid conditions [kPa], noting that most temperature drop happens in
     # upper section (because surrounding rock temperature is lowest in upper section)
     rhowater = (density_water_kg_per_m3(Taverage, pressure=model.reserv.lithostatic_pressure())
-                * np.linspace(1, 1, len(model.wellbores.ProducedTemperature.value)))
+                * np.linspace(1, 1, len(model.reserv.timevector.value)))
 
     # replace with correlation based on Tinjaverage
-    muwater = viscosity_water_Pa_sec(Taverage, pressure=model.reserv.lithostatic_pressure()) * np.linspace(1, 1, len(model.wellbores.ProducedTemperature.value))
+    muwater = (viscosity_water_Pa_sec(Taverage, pressure=model.reserv.lithostatic_pressure())
+               * np.linspace(1, 1, len(model.reserv.timevector.value)))
     v = nprod / ninj * wellflowrate * (1.0 + waterloss) / rhowater / (math.pi / 4. * welldiam ** 2)
     Rewater = 4. * nprod / ninj * wellflowrate * (1.0 + waterloss) / (
         muwater * math.pi * welldiam)  # laminar or turbulent flow?
@@ -265,7 +266,8 @@ def ProdPressureDropsAndPumpingPowerUsingImpedenceModel(f3: float, vprod: float,
                                                         rhowaterprod: float, rhowaterreservoir: float, depth: float,
                                                         wellflowrate: float, prodwelldiam: float,
                                                         impedance: float, nprod: int, waterloss: float,
-                                                        pumpeff: float) -> tuple:
+                                                        pumpeff: float, tilt: float = 90.0,
+                                                        trim_neg_to_zero: bool = True) -> tuple:
     """
     Calculate Pressure Drops and Pumping Power needed for the production well using the Impedance Model
         :param f3: friction factor [-]
@@ -302,7 +304,8 @@ def ProdPressureDropsAndPumpingPowerUsingImpedenceModel(f3: float, vprod: float,
     DPReserv = impedance * nprod * wellflowrate * 1000. / rhowaterreservoir
 
     # buoyancy pressure drop [kPa]
-    DPBouyancy = (rhowaterprod - rhowaterinj) * depth * 9.81 / 1E3  # /1E3 to convert from Pa to kPa
+    gravity_tilt = 9.81 * np.sin(np.radians(tilt))
+    DPBouyancy = (rhowaterprod - rhowaterinj) * gravity_tilt / 1E3  # /1E3 to convert from Pa to kPa
 
     # overall pressure drop
     DPOverall = DPReserv + DPProdWell + DPBouyancy
@@ -312,7 +315,8 @@ def ProdPressureDropsAndPumpingPowerUsingImpedenceModel(f3: float, vprod: float,
     PumpingPower = DPOverall * nprod * wellflowrate * (1 + waterloss) / rhowaterinj / pumpeff / 1E3
 
     # in GEOPHIRES v1.2, negative pumping power values become zero (b/c we are not generating electricity)
-    PumpingPower = [0. if x < 0. else x for x in PumpingPower]
+    if trim_neg_to_zero:
+        PumpingPower = [0. if x < 0. else x for x in PumpingPower]
 
     return DPOverall, PumpingPower, DPProdWell, DPReserv, DPBouyancy
 
@@ -599,6 +603,71 @@ def InjPressureDropAndPumpingPowerUsingIndexes(
     return PumpingPowerInj, DPInjWell, Pplantoutlet, Pprodwellhead
 
 
+def calculate_total_drilling_lengths_m(Configuration, numnonverticalsections: int, nonvertical_length_km: float,
+                                       InputDepth_km: float, OutputDepth_km: float, nprod:int, ninj:int,
+                                       junction_depth_km: float = 0.0, angle_rad: float = 0.0) -> tuple:
+    """
+    returns the total length, vertical length, and non-vertical lengths, depending on the configuration
+    :param Configuration:  configuration of the well
+    :type Configuration: :class:`~geophires
+    :param numnonverticalsections: number of non-vertical sections
+    :type numnonverticalsections: int
+    :param nonvertical_length_km: length of non-vertical sections in km
+    :type nonvertical_length_km: float
+    :param InputDepth_km: depth of the well in km
+    :type InputDepth_km: float
+    :param OutputDepth_km: depth of the output end of the well in km, if U shaped, and not horizontal
+    :type OutputDepth_km: float
+    :param nprod: number of production wells
+    :type nprod: int
+    :param ninj: number of injection wells
+    :param junction_depth_km: depth of the junction in km
+    :type junction_depth_km: float
+    :param angle_rad: angle of the well in radians, from horizontal
+    :type angle_rad: float
+    :return: total length, vertical length, lateral, and junction lengths in meters
+    :rtype: tuple
+    """
+    tot_pipe_length_m = vertical_pipe_length_m = lateral_pipe_length_m = tot_to_junction_m = 0.0
+    if Configuration is Configuration.ULOOP:
+        # Total drilling depth of both wells and laterals in U-loop [m]
+        vertical_pipe_length_m = (nprod * InputDepth_km * 1000.0) + (ninj * OutputDepth_km * 1000.0)
+        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
+
+    elif Configuration is Configuration.COAXIAL:
+        # Total drilling depth of well and lateral in co-axial case [m] - is not necessarily only vertical
+        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
+        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
+
+    elif Configuration is Configuration.VERTICAL:
+        # Total drilling depth of well in vertical case [m]
+        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
+        lateral_pipe_length_m = 0.0
+
+    elif Configuration is Configuration.L:
+        # Total drilling depth of well in L case [m]
+        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
+        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
+
+    elif Configuration is Configuration.EAVORLOOP:
+        # Total drilling length of well in EavorLoop [m]
+        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
+
+        # now calculate the distance from the bottom of the vertical to the junction of the laterals [m]
+        O1 = (junction_depth_km - InputDepth_km) * 1000.0  # in meters
+        tot_to_junction_m = (O1 / math.sin(angle_rad)) * 2  # there are two of these of each EavorLoop
+
+        # now calculate the distance from the junction of the laterals to the end of the laterals [m]
+        O2 = (OutputDepth_km - junction_depth_km) * 1000.0   # in meters
+        lateral_pipe_length_m = (O2 / math.sin(angle_rad)) * 2  # there are two of these of each lateral of an EavorLoop
+        lateral_pipe_length_m = lateral_pipe_length_m * numnonverticalsections  # there are numnonverticalsections of these
+    else:
+        raise ValueError(f'Invalid Configuration: {Configuration}')
+
+    tot_pipe_length_m = vertical_pipe_length_m + lateral_pipe_length_m + tot_to_junction_m
+    return tot_pipe_length_m, vertical_pipe_length_m, lateral_pipe_length_m, tot_to_junction_m
+
+
 class WellBores:
     def __init__(self, model: Model):
         """
@@ -879,20 +948,20 @@ class WellBores:
             ErrMessage="assume there is not an injection reservoir, so there is no injection reservoir inflation rate",
             ToolTipText="enter the rate at which the pressure increases per year in the injection reservoir (1000 kPa/yr)"
         )
-        # This is a alias for "Well Geometry Configuration" - putting it here for backwards compatibility
+        # This is an alias for "Well Geometry Configuration" - putting it here for backwards compatibility
         self.Configuration = self.ParameterDict[self.Configuration.Name] = intParameter(
             "Closed-loop Configuration",
             DefaultValue=Configuration.VERTICAL,
-            AllowableRange=[1, 2, 3, 4],
+            AllowableRange=[1, 2, 3, 4, 5],
             UnitType=Units.NONE,
             Required=True,
             ErrMessage="assume simple vertical well (3)"
         )
-        # This is a alias for "Closed-loop Configuration" - putting it here for backwards compatibility
+        # This is an alias for "Closed-loop Configuration" - putting it here for backwards compatibility
         self.Configuration = self.ParameterDict[self.Configuration.Name] = intParameter(
             "Well Geometry Configuration",
             DefaultValue=Configuration.VERTICAL,
-            AllowableRange=[1, 2, 3, 4],
+            AllowableRange=[1, 2, 3, 4, 5],
             UnitType=Units.NONE,
             Required=True,
             ErrMessage="assume simple vertical well (3)"
@@ -950,61 +1019,6 @@ class WellBores:
             UnitType=Units.NONE,
             ErrMessage="assume default for Number of Nonvertical Wellbore Sections (1)",
             ToolTipText="Number of Nonvertical Wellbore Sections"
-        )
-        self.vertical_wellbore_spacing = self.ParameterDict[self.vertical_wellbore_spacing.Name] = floatParameter(
-            'Vertical Wellbore Spacing',
-            DefaultValue=100.0,
-            Min=0.01,
-            Max=10000.0,
-            UnitType=Units.LENGTH,
-            PreferredUnits=LengthUnit.METERS,
-            CurrentUnits=LengthUnit.METERS,
-            ErrMessage='assume default for Vertical Wellbore Spacing (100.0 meters)',
-            ToolTipText='Horizontal distance between vertical wellbores'
-        )
-        self.lateral_spacing = self.ParameterDict[self.lateral_spacing.Name] = floatParameter(
-            'Lateral Spacing',
-            DefaultValue=100.0,
-            Min=0.01,
-            Max=10000.0,
-            UnitType=Units.LENGTH,
-            PreferredUnits=LengthUnit.METERS,
-            CurrentUnits=LengthUnit.METERS,
-            ErrMessage='assume default for Lateral Spacing (100.0 meters)',
-            ToolTipText='Horizontal distance between laterals'
-        )
-        self.lateral_inclination_angle = self.ParameterDict[self.lateral_inclination_angle.Name] = floatParameter(
-            'Lateral Inclination Angle',
-            DefaultValue=20.0,
-            Min=0.0,
-            Max=89.999999,
-            UnitType=Units.ANGLE,
-            PreferredUnits=AngleUnit.DEGREES,
-            CurrentUnits=AngleUnit.DEGREES,
-            ErrMessage='assume default for Lateral Inclination Angle (20.0 degrees)',
-            ToolTipText='Inclination of the lateral section, where 0 degrees would mean vertical while 90 degrees is pure horizontal'
-        )
-        self.element_length = self.ParameterDict[self.element_length.Name] = floatParameter(
-            'Discretization Length',
-            DefaultValue=150.0,
-            Min=0.01,
-            Max=10000.0,
-            UnitType=Units.LENGTH,
-            PreferredUnits=LengthUnit.METERS,
-            CurrentUnits=LengthUnit.METERS,
-            ErrMessage='assume default for Discretization Length (2000.0 meters)',
-            ToolTipText='length of the geometry discretization'
-        )
-        self.junction_depth = self.ParameterDict[self.junction_depth.Name] = floatParameter(
-            'Junction Depth',
-            DefaultValue=4000.0,
-            Min=1000,
-            Max=15000.0,
-            UnitType=Units.LENGTH,
-            PreferredUnits=LengthUnit.METERS,
-            CurrentUnits=LengthUnit.METERS,
-            ErrMessage='assume default for Junction Depth (4000.0 meters)',
-            ToolTipText='vertical depth where the different laterals branch out'
         )
         self.NonverticalsCased = self.ParameterDict[self.NonverticalsCased.Name] = boolParameter(
             "Multilaterals Cased",
@@ -1148,6 +1162,34 @@ class WellBores:
             PreferredUnits=PressureUnit.KPASCAL,
             CurrentUnits=PressureUnit.KPASCAL
         )
+        self.total_drilled_length = self.OutputParameterDict[self.total_drilled_length.Name] = OutputParameter(
+            Name="Total length of all drilling",
+            value=-1.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.KILOMETERS,
+            CurrentUnits=LengthUnit.KILOMETERS
+        )
+        self.tot_vert_m = self.OutputParameterDict[self.tot_vert_m.Name] = OutputParameter(
+            Name="Total length of vertical drilling",
+            value=-1.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS
+        )
+        self.tot_to_junction_m = self.OutputParameterDict[self.tot_to_junction_m.Name] = OutputParameter(
+            Name="Total length from lateral junction to base of vertical drilling",
+            value=-1.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS
+        )
+        self.tot_lateral_m = self.OutputParameterDict[self.tot_lateral_m.Name] = OutputParameter(
+            Name="Total length of lateral drilling",
+            value=-1.0,
+            UnitType=Units.LENGTH,
+            PreferredUnits=LengthUnit.METERS,
+            CurrentUnits=LengthUnit.METERS
+        )
 
     def __str__(self):
         return "WellBores"
@@ -1226,6 +1268,8 @@ class WellBores:
                             self.Configuration.value = Configuration.VERTICAL
                         elif ParameterReadIn.sValue == str(4):
                             self.Configuration.value = Configuration.L
+                        elif ParameterReadIn.sValue == str(5):
+                            self.Configuration.value = Configuration.EAVORLOOP
                         else:
                             raise ValueError(f'Invalid Configuration: {self.Configuration.value}')
         else:
@@ -1249,6 +1293,41 @@ class WellBores:
         # and if you do, do it before or after you call you own version of this method.  If you do, you can also
         # choose to call this method from you class, which can effectively run the calculations of the superclass,
         # making all thr values available to your methods. but you had better have set all the parameters!
+
+        # Calculate the total length of all drilling
+        if not self.injection_reservoir_depth.Provided:
+            self.injection_reservoir_depth.value = model.reserv.depth.quantity().to('km').magnitude
+        else:
+            self.injection_reservoir_depth.value = self.injection_reservoir_depth.quantity().to('km').magnitude
+
+        if not self.IsAGS.value:
+            input_vert_depth_km = output_vert_depth_km = model.reserv.depth.quantity().to('km').magnitude
+            junction_depth_km = angle_rad = 0.0
+            #self.tot_lateral_m.value = self.junction_depth_m.value = 0.0
+        else:
+            # must be one of the closed loop designs
+            if not hasattr(self, 'junction_depth'):
+                # This must be a cylindrical reservoir for CLGS or Wanju method
+                input_vert_depth_km =  model.reserv.InputDepth.quantity().to('km').magnitude
+                output_vert_depth_km = model.reserv.OutputDepth.quantity().to('km').magnitude
+            else:
+                # This must be SBT
+                self.tot_vert_m.value = self.vertical_section_length.quantity().to('km').magnitude
+                input_vert_depth_km = self.vertical_section_length.quantity().to('km').magnitude
+                output_vert_depth_km = self.lateral_endpoint_depth.quantity().to('km').magnitude
+                junction_depth_km = self.junction_depth.quantity().to('km').magnitude
+                angle_rad = ((90.0 * np.pi) / 180) - self.lateral_inclination_angle.quantity().to('radians').magnitude
+
+
+        self.total_drilled_length.value, self.tot_vert_m.value, self.tot_lateral_m.value, self.tot_to_junction_m.value = \
+            calculate_total_drilling_lengths_m(self.Configuration.value,
+                                               self.numnonverticalsections.value,
+                                               self.Nonvertical_length.value / 1000.0,
+                                               input_vert_depth_km,
+                                               output_vert_depth_km,
+                                               self.nprod.value,
+                                               self.ninj.value)
+        self.total_drilled_length.value = self.total_drilled_length.value / 1000.0  # convert to km
 
         # calculate the reservoir pressure as a function of time
         if self.usebuiltinhydrostaticpressurecorrelation:
@@ -1297,7 +1376,6 @@ class WellBores:
                                                                                    model.reserv.averagegradient.value,
                                                                                    injection_reservoir_static_pressure)
 
-#            if not self.injection_reservoir_initial_pressure.Provided:
             self.injection_reservoir_pressure.value = InjectionReservoirPressurePredictor(model.surfaceplant.plant_lifetime.value,
                                                                                  model.economics.timestepsperyear.value,
                                                                                  self.injection_reservoir_initial_pressure.value,
@@ -1344,7 +1422,7 @@ class WellBores:
         if model.reserv.resoption.value in \
             [ReservoirModel.MULTIPLE_PARALLEL_FRACTURES, ReservoirModel.LINEAR_HEAT_SWEEP,
              ReservoirModel.SINGLE_FRACTURE, ReservoirModel.ANNUAL_PERCENTAGE]:
-            indexfirstmaxdrawdown = np.argmax(self.ProducedTemperature.value < (1 - model.wellbores.maxdrawdown.value) *
+            indexfirstmaxdrawdown = np.argmax(self.ProducedTemperature.value < (1 - self.maxdrawdown.value) *
                                               self.ProducedTemperature.value[0])
             if indexfirstmaxdrawdown > 0:  # redrilling necessary
                 self.redrill.value = int(np.floor(len(self.ProducedTemperature.value) / indexfirstmaxdrawdown))

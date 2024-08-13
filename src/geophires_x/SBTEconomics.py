@@ -8,72 +8,6 @@ from geophires_x.Units import *
 from geophires_x.OptionList import WorkingFluid, EndUseOptions, EconomicModel
 
 
-def calculate_total_drilling_lengths_m(Configuration, numnonverticalsections: int, nonvertical_length_km: float,
-                                       InputDepth_km: float, OutputDepth_km: float, junction_depth_km: float, angle_rad: float,
-                                       nprod:int, ninj:int) -> tuple:
-    """
-    returns the total length, vertical length, and non-vertical lengths, depending on the configuration
-    :param Configuration: Configuration of the well
-    :type Configuration: :class:`~geophires
-    :param numnonverticalsections: number of non-vertical sections
-    :type numnonverticalsections: int
-    :param nonvertical_length_km: length of non-vertical sections in km
-    :type nonvertical_length_km: float
-    :param InputDepth_km: depth of the well in km
-    :type InputDepth_km: float
-    :param OutputDepth_km: depth of the output end of the well in km, if U shaped, and not horizontal
-    :type OutputDepth_km: float
-    :param junction_depth_km: depth of the junction in km
-    :type junction_depth_km: float
-    :param angle_rad: angle of the well in radians, from horizontal
-    :type angle_rad: float
-    :param nprod: number of production wells
-    :type nprod: int
-    :param ninj: number of injection wells
-    :return: total length, vertical length, lateral, and junction lengths in meters
-    :rtype: tuple
-    """
-
-    tot_pipe_length_m = vertical_pipe_length_m = lateral_pipe_length_m = tot_to_junction_m = 0.0
-    if Configuration is Configuration.ULOOP:
-        # Total drilling depth of both wells and laterals in U-loop [m]
-        vertical_pipe_length_m = (nprod * InputDepth_km * 1000.0) + (ninj * OutputDepth_km * 1000.0)
-        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
-
-    elif Configuration is Configuration.COAXIAL:
-        # Total drilling depth of well and lateral in co-axial case [m] - is not necessarily only vertical
-        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
-        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
-
-    elif Configuration is Configuration.VERTICAL:
-        # Total drilling depth of well in vertical case [m]
-        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
-        lateral_pipe_length_m = 0.0
-
-    elif Configuration is Configuration.L:
-        # Total drilling depth of well in L case [m]
-        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
-        lateral_pipe_length_m = numnonverticalsections * nonvertical_length_km * 1000.0
-
-    elif Configuration is Configuration.EAVORLOOP:
-        # Total drilling length of well in EavorLoop [m]
-        vertical_pipe_length_m = (nprod + ninj) * InputDepth_km * 1000.0
-
-        # now calculate the distance from the bottom of the vertical to the junction of the laterals [m]
-        O1 = (junction_depth_km - InputDepth_km) * 1000.0  # in meters
-        tot_to_junction_m = (O1 / math.sin(angle_rad)) * 2  # there are two of these of each EavorLoop
-
-        # now calculate the distance from the junction of the laterals to the end of the laterals [m]
-        O2 = (OutputDepth_km - junction_depth_km) * 1000.0   # in meters
-        lateral_pipe_length_m = (O2 / math.sin(angle_rad)) * 2  # there are two of these of each lateral of an EavorLoop
-        lateral_pipe_length_m = lateral_pipe_length_m * numnonverticalsections  # there are numnonverticalsections of these
-    else:
-        raise ValueError(f'Invalid Configuration: {Configuration}')
-
-    tot_pipe_length_m = vertical_pipe_length_m + lateral_pipe_length_m + tot_to_junction_m
-    return tot_pipe_length_m, vertical_pipe_length_m, lateral_pipe_length_m, tot_to_junction_m
-
-
 def calculate_cost_of_lateral_section(model: Model, length_m: float, well_correlation: int,
                                       lateral_drilling_cost_per_m: float,
                                       num_lateral_sections: int,
@@ -270,6 +204,7 @@ class SBTEconomics(Economics.Economics):
         )
 
         # results are stored here and in the parent ProducedTemperature array
+
 """
         model.logger.info(f'complete {__class__!s}: {sys._getframe().f_code.co_name}')
 
@@ -316,6 +251,9 @@ class SBTEconomics(Economics.Economics):
         """
         model.logger.info(f'Init {__class__!s}: {sys._getframe().f_code.co_name}')
 
+        #if hasattr(model.wellbores, 'numnonverticalsections') and model.wellbores.numnonverticalsections.Provided:
+            #self.cost_lateral_section.value = 0.0
+
         # capital costs
         # well costs (using GeoVision drilling correlations). These are calculated whether totalcapcostvalid = 1
         # start with the cost of one well
@@ -329,42 +267,6 @@ class SBTEconomics(Economics.Economics):
             self.Cwell.value = ((self.cost_one_production_well.value * model.wellbores.nprod.value) +
                                 (self.cost_one_injection_well.value * model.wellbores.ninj.value))
         else:
-            if hasattr(model.wellbores, 'numnonverticalsections') and model.wellbores.numnonverticalsections.Provided:
-                self.cost_lateral_section.value = 0.0
-                if not model.wellbores.IsAGS.value:
-                    input_vert_depth_km = model.wellbores.vertical_section_length.quantity().to('km').magnitude
-                    output_vert_depth_km = 0.0
-                else:
-                    input_vert_depth_km = model.wellbores.vertical_section_length.quantity().to('km').magnitude
-                    output_vert_depth_km = model.wellbores.lateral_endpoint_depth.quantity().to('km').magnitude
-                    if hasattr(model.wellbores, 'junction_depth'):
-                        junction_depth_km = model.wellbores.junction_depth.quantity().to('km').magnitude
-                    if hasattr(model.wellbores, 'lateral_inclination_angle'):
-                        angle_rad = ((90.0 * np.pi)/180) - model.wellbores.lateral_inclination_angle.quantity().to('radians').magnitude
-                    model.reserv.depth.value = input_vert_depth_km
-
-                model.wellbores.injection_reservoir_depth.value = input_vert_depth_km
-
-                model.wellbores.total_drilled_length.value, tot_vert_m, tot_lateral_m, tot_to_junction_m = \
-                                    calculate_total_drilling_lengths_m(model.wellbores.Configuration.value,
-                                                                      model.wellbores.numnonverticalsections.value,
-                                                                      model.wellbores.Nonvertical_length.value / 1000.0,
-                                                                      input_vert_depth_km,
-                                                                      output_vert_depth_km,
-                                                                      junction_depth_km,
-                                                                      angle_rad,
-                                                                      model.wellbores.nprod.value,
-                                                                      model.wellbores.ninj.value)
-                model.wellbores.total_drilled_length.value = model.wellbores.total_drilled_length.value/1000.0  # convert to km
-
-            else:
-                tot_m = tot_vert_m = model.wellbores.vertical_section_length.quantity().to('km').magnitud
-                tot_lateral_m = 0.0
-                if not model.wellbores.injection_reservoir_depth.Provided:
-                    model.wellbores.injection_reservoir_depth.value = model.reserv.depth.quantity().to('km').magnitude
-                else:
-                    model.wellbores.injection_reservoir_depth.value = model.wellbores.injection_reservoir_depth.quantity().to('km').magnitude
-
             # calculate the cost of one vertical production well
             # 1.05 for 5% indirect costs
             self.cost_one_production_well.value = 1.05 * Economics.calculate_cost_of_one_vertical_well(model, model.wellbores.vertical_section_length.value,
@@ -375,21 +277,16 @@ class SBTEconomics(Economics.Economics):
 
             # If there is no injector well, then we assume we are doing a coaxial closed-loop.
             if model.wellbores.ninj.value == 0:
-                self.cost_one_injection_well.value = -1.0
+                self.cost_one_injection_well.value = 0.0
             else:
                 # Now calculate the cost of one vertical injection well
-                # 1.05 for 5% indirect costs
-                self.cost_one_injection_well.value = 1.05 * Economics.calculate_cost_of_one_vertical_well(model,
-                                                                                         model.wellbores.injection_reservoir_depth.value * 1000.0,
-                                                                                         self.wellcorrelation.value,
-                                                                                         self.Vertical_drilling_cost_per_m.value,
-                                                                                         self.per_injection_well_cost.Name,
-                                                                                         self.injection_well_cost_adjustment_factor.value)
+                # assume the cost of the injector and producer is the same
+                self.cost_one_injection_well.value = self.cost_one_production_well.value
 
             if hasattr(model.wellbores, 'numnonverticalsections') and model.wellbores.numnonverticalsections.Provided:
                 # now calculate the costs if we have a lateral section
                 # 1.05 for 5% indirect costs
-                self.cost_lateral_section.value = 1.05 * calculate_cost_of_lateral_section(model, tot_lateral_m,
+                self.cost_lateral_section.value = 1.05 * calculate_cost_of_lateral_section(model, model.wellbores.tot_lateral_m.value,
                                                                                     self.wellcorrelation.value,
                                                                                     self.Nonvertical_drilling_cost_per_m.value,
                                                                                     model.wellbores.numnonverticalsections.value,
@@ -403,7 +300,7 @@ class SBTEconomics(Economics.Economics):
                 # of this section as if it were a vertical section.
                 if model.wellbores.Configuration.value == Configuration.EAVORLOOP:
                     self.cost_to_junction_section.value = 1.05 * Economics.calculate_cost_of_one_vertical_well(model,
-                                                                                         tot_to_junction_m,
+                                                                                         model.wellbores.tot_to_junction_m.value,
                                                                                          self.wellcorrelation.value,
                                                                                          self.Vertical_drilling_cost_per_m.value,
                                                                                          self.per_injection_well_cost.Name,
@@ -413,7 +310,9 @@ class SBTEconomics(Economics.Economics):
                 self.cost_to_junction_section.value = 0.0
 
             # cost of the well field
-            self.Cwell.value = (self.cost_one_production_well.value * model.wellbores.nprod.value) + (self.cost_one_injection_well.value * model.wellbores.ninj.value) + self.cost_lateral_section.value + self.cost_to_junction_section.value
+            self.Cwell.value = ((self.cost_one_production_well.value * model.wellbores.nprod.value) +
+                                (self.cost_one_injection_well.value * model.wellbores.ninj.value) +
+                                self.cost_lateral_section.value + self.cost_to_junction_section.value)
 
         # reservoir stimulation costs (M$/injection well). These are calculated whether totalcapcost.Valid = 1
         if self.ccstimfixed.Valid:

@@ -3,7 +3,7 @@ Closed-loop Configuration, 1, ----uloop
 End-Use Option, 1,        -----elec
 Heat Transfer Fluid, 2, ----sCO2
 Number of Production Wells, 1,      ---- 1 production well accounts for the full configuration - 1 up, one down, and a horizontal section
-Number of Injection Wells, 0,		---- No injectors in a closed uloop
+Number of Injection Wells, 1,		---- No injectors in a closed uloop
 All-in Vertical Drilling Costs, 1000.0
 All-in Nonvertical Drilling Costs, 1000.0
 Production Flow Rate per Well, 40, ---- kg/s for water / 40 kg/s for sCO2

@@ -719,6 +719,13 @@ class SurfacePlantAGS(SurfacePlant):
             sys.exit()
         self.initialize(model)
 
+        # calculate power plant entering temperature
+        self.TenteringPP.value = SurfacePlant.power_plant_entering_temperature(self, self.enduse_option.value,
+                                model.reserv.timevector.value, self.T_chp_bottom.value, model.wellbores.ProducedTemperature.value)
+
+        # Availability water
+        self.Availability.value = SurfacePlant.availability_water(self, self.ambient_temperature.value, self.TenteringPP.value, self.ambient_temperature.value)
+
         self.Linear_production_temperature = model.wellbores.InterpolatedTemperatureArray
         self.Linear_production_pressure = model.wellbores.InterpolatedPressureArray
         self.AveProductionTemperature.value = np.average(self.Linear_production_temperature)

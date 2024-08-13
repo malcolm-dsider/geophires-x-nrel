@@ -240,6 +240,32 @@ class SBTReservoir(CylindricalReservoir):
             A value of 0.5 would model the convective term 50% explicit and 50% implicit, \
             which may be slightly more accurate than fully implicit."
         )
+        self.initial_timestep_count = self.ParameterDict[self.initial_timestep_count.Name] = intParameter(
+            'SBT Initial Timestep Count',
+            DefaultValue=5,
+            AllowableRange = [1,150],
+            UnitType=Units.NONE,
+            ErrMessage='assume default for Initial Timestep Count (5)',
+            ToolTipText='The number of timesteps in the first ~3 hours of model'
+        )
+        self.final_timestep_count = self.ParameterDict[self.final_timestep_count.Name] = intParameter(
+            'SBT Final Timestep Count',
+            DefaultValue=70,
+            AllowableRange = [5, 1000],
+            UnitType=Units.NONE,
+            ErrMessage='assume default for Final Timestep Count 70)',
+            ToolTipText='The number of timesteps after the first ~3 hours of model'
+        )
+        self.initial_final_timestep_transition = self.ParameterDict[self.initial_final_timestep_transition.Name] = intParameter(
+            'SBT Initial to Final Timestep Transition',
+            DefaultValue=9900,
+            AllowableRange = [1, 40_000_000],
+            UnitType=Units.TIME,
+            PreferredUnits=TimeUnit.SECOND,
+            CurrentUnits=TimeUnit.SECOND,
+            ErrMessage='assume default for Initial to Final Timestep Transition (9900 seconds)',
+            ToolTipText='The time in secs at which the time arrays switches from closely spaced linear to logrithmatic'
+        )
 
         sclass = str(__class__).replace("<class \'", "")
         self.MyClass = sclass.replace("\'>", "")
@@ -1059,60 +1085,34 @@ class SBTReservoir(CylindricalReservoir):
         Calculate the U-loop version of the SBT model
         """
         model.logger.info(f'Init {str(__class__)}: {sys._getframe().f_code.co_name}')
-        self.averagegradient.value = self.gradient.value[0]
-        self.Trock.value = self.Tsurf.value + (self.gradient.value[0] * model.wellbores.lateral_endpoint_depth.value)
+        self.averagegradient.value = np.average(self.gradient.value[0:self.numseg.value])
+        self.Trock.value = self.Tsurf.value + (self.averagegradient.value * model.wellbores.lateral_endpoint_depth.value)
 
         lateralflowallocation = []
         for i in range(model.wellbores.numnonverticalsections.value):
             lateralflowallocation.append(1 / model.wellbores.numnonverticalsections.value)
-            # interpolate time steps - but consider ignoring the first step.
-            # simulation times [s] (must start with 0; to obtain smooth results,
-            # abrupt changes in time step size should be avoided. logarithmic spacing is recommended)
-        times = np.concatenate((np.linspace(0,9900,100), np.logspace(np.log10(100*100),
-                                np.log10(model.surfaceplant.plant_lifetime.value * 365 * 24 * 3600), 75)))
-        # Note 1: When providing a variable injection temperature or flow rate, a finer time grid should be considered. Below is one with long term time steps of about 36 days.
+
+        # interpolate time steps - but consider ignoring the first step.
+        # simulation times [s] (must start with 0; to obtain smooth results,
+        # abrupt changes in time step size should be avoided. logarithmic spacing is recommended)
+        initial_times = np.linspace(0, self.initial_final_timestep_transition.value, self.initial_timestep_count.value)
+        initial_time_interval = initial_times[1] - initial_times[0]
+        final_start = self.initial_final_timestep_transition.value + initial_time_interval
+        final_times = np.logspace(np.log10(final_start), np.log10(model.surfaceplant.plant_lifetime.value * 365 * 24 * 3600), self.final_timestep_count.value)
+        times = np.concatenate([initial_times, final_times])
+        # Note 1: When providing a variable injection temperature or flow rate, a finer time grid should be considered.
+        # Below is one with long term time steps of about 36 days.
         # times = [0] + list(range(100, 10000, 100)) + list(np.logspace(np.log10(100*100), np.log10(0.1*365*24*3600), 40)) + list(np.arange(0.2*365*24*3600, 20*365*24*3600, 0.1*365*24*3600))
-        # Note 2: To capture the start-up effects, several small time steps are taken during the first 10,000 seconds in the time vector considered. To speed up the simulation, this can be avoided with limited impact on the long-term results. For example, an alternative time vector would be:
+        # Note 2: To capture the start-up effects, several small time steps need to be taken during
+        # the first 99000 seconds in the time vector considered.
+        # To speed up the simulation, this can be avoided with limited impact on the long-term results.
+        # For example, an alternative time vector would be:
         # times = [0] + list(range(100, 1000, 100)) + list(range(1000, 10000, 1000)) + list(np.logspace(np.log10(100*100), np.log10(20*365*24*3600), 75))
 
         # (x,y,z)-coordinates of centerline of injection well, production well and laterals
         # The vectors storing the x-, y- and z-coordinates should be column vectors
         # To obtain smooth results, abrupt changes in segment lengths should be avoided.
         # Coordinates of injection well (coordinates are provided from top to bottom in the direction of flow)
-        #0-2000 m with a 100 m step
-        #-1000 to 1000 m means 2000 long lateral
-        zinj = np.arange(0, -2000 - 100, -100).reshape(-1, 1)
-        yinj = np.zeros((len(zinj), 1))
-        xinj = -1000 * np.ones((len(zinj), 1))
-
-        # Coordinates of production well (coordinates are provided from bottom to top in the direction of flow)
-        zprod = np.arange(-2000, 0 + 100, 100).reshape(-1, 1)
-        yprod = np.zeros((len(zprod), 1))
-        xprod = 1000 * np.ones((len(zprod), 1))
-
-        # (x, y, z)-coordinates of laterals are stored in three matrices (one each for the x, y, and z coordinates).
-        # The number of columns in each matrix corresponds to the number of laterals. The number of discretizations
-        # should be the same for each lateral.
-        # Coordinates of lateral 1 (coordinates are provided in the direction of flow; the first coordinate should match
-        # the last coordinate of the injection well, and the last coordinate should match the first coordinate of the
-        # production well)
-        # -918 -814 has to do with curvature of the lateral
-        # 100 is lateral spacing
-        xlat = np.concatenate((np.array([-1000, -918, -814]), np.linspace(-706, 706, 14), np.array([814, 918, 1000]))).reshape(-1,1)
-        ylat = np.concatenate((100 * np.cos(np.linspace(-np.pi/2, 0, 3)), 100 * np.ones(14), 100 * np.cos(np.linspace(0, np.pi/2, 3)))).reshape(-1,1)
-        zlat = (-2000 * np.ones((len(xlat)))).reshape(-1,1)
-
-        # Coordinates of lateral 2 (coordinates are provided in the direction of flow; the first coordinate should match
-        # the last coordinate of the injection well, and the last coordinate should match the first coordinate of the
-        # production well)
-        xlat = np.hstack((xlat,xlat,np.linspace(-1000,1000,20).reshape(-1,1)))
-        ylat = np.hstack((ylat,-ylat, np.zeros(len(ylat)).reshape(-1,1)))
-        zlat = np.hstack((zlat,zlat,zlat))
-
-#        xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat = generate_wireframe_model(2000, 3, 100, 150, 4000,
-#                                                                                           2000, 20 * np.pi / 180, 100,
-#                                                                                           True)
-
         xinj, yinj, zinj, xprod, yprod, zprod, xlat, ylat, zlat = generate_wireframe_model(model.wellbores.lateral_endpoint_depth.value,
                                                                                            model.wellbores.numnonverticalsections.value,
                                                                                            model.wellbores.lateral_spacing.value,
@@ -1168,7 +1168,7 @@ class SBTReservoir(CylindricalReservoir):
 
         RelativeLengthChanges = (DeltazOrdered[1:] - DeltazOrdered[:-1]) / DeltazOrdered[:-1]
 
-        if max(abs(RelativeLengthChanges)) > 0.5:
+        if max(abs(RelativeLengthChanges)) > 0.6:
             msg = 'Warning: abrupt change(s) in segment length detected, which may cause numerical instabilities. Good practice is to avoid abrupt length changes to obtain smooth results.'
             print(f'{msg}')
             model.logger.warning(msg)

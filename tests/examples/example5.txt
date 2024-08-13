@@ -44,6 +44,7 @@ Utilization Factor,0.9,			--- [-]
 Surface Temperature,15,			--- [deg.C]
 Ambient Temperature,15,			--- [deg.C]
 End-Use Efficiency Factor,0.9,		--- [-]
+Power Plant Type, 9
 
 *** Economic/Financial Parameters ***
 *************************************
