@@ -1121,7 +1121,7 @@ class SBTReservoir(CylindricalReservoir):
                                                                                            model.wellbores.vertical_section_length.value,
                                                                                            model.wellbores.lateral_inclination_angle.value * np.pi / 180.0,
                                                                                            model.wellbores.vertical_wellbore_spacing.value,
-                                                                                           True)
+                                                                                           False)
 
         # Merge x-, y-, and z-coordinates
         x = np.concatenate((xinj, xprod))
@@ -1722,7 +1722,8 @@ class SBTReservoir(CylindricalReservoir):
             # Calculating the fluid outlet temperature at the top of the first element
             top_element_index = len(xinj) + len(xprod) - 3
             self.Tresoutput.value[i] = Twprevious[top_element_index] + (Twprevious[top_element_index] - Twprevious[top_element_index - 1]) * 0.5
-            print(times[i] / 3.154e+7, ',', self.Tresoutput.value[i])
+            if False:
+                print(times[i] / 3.154e+7, ',', self.Tresoutput.value[i])
 
         # Save the nonlinear Time results as 2D array Output Parameter
         self.NonLinearTime_temperature.value = np.column_stack((times, self.Tresoutput.value))

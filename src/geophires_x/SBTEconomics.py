@@ -44,22 +44,22 @@ def calculate_cost_of_lateral_section(model: Model, length_m: float, well_correl
     # Check if  well length is out of standard bounds for cost correlation
     length_per_section_m = length_m / num_lateral_sections
     correlations_min_valid_length_m = 500.
-    correlations_max_valid_length_m = 7000.
+    correlations_max_valid_length_m = 8000.
     cost_of_lateral_section = 0.0
     cost_per_section = 0.0
     if length_per_section_m < correlations_min_valid_length_m and not well_correlation is WellDrillingCostCorrelation.SIMPLE:
         well_correlation = WellDrillingCostCorrelation.SIMPLE
         model.logger.warning(
-            f'Invalid cost correlation specified ({well_correlation}) for drilling length '
-            f'<{correlations_min_valid_length_m}m ({length_m}m). '
+            f'Invalid cost correlation specified ({well_correlation}) for per lateral section drilling length '
+            f'<{correlations_min_valid_length_m}m ({length_per_section_m}m). '
             f'Falling back to simple user-specified cost '
             f'({lateral_drilling_cost_per_m} per meter)'
         )
 
     if length_per_section_m > correlations_max_valid_length_m and not well_correlation is WellDrillingCostCorrelation.SIMPLE:
         model.logger.warning(
-            f'{well_correlation} may be invalid for drilling length '
-            f'>{correlations_max_valid_length_m}m ({length_m}m). '
+            f'{well_correlation} may be invalid for per lateral section rilling length '
+            f'>{correlations_max_valid_length_m}m ({length_per_section_m}m). '
             f'Consider using {WellDrillingCostCorrelation.SIMPLE} (per-meter cost) or '
             f'{fixed_well_cost_name} (fixed cost per well) instead.'
         )
