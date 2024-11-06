@@ -21,6 +21,9 @@ class GeophiresInputEnum(str, Enum):
     def __eq__(self, other):
         return str(self) == str(other)
 
+    def __ne__(self, other):
+        return str(self) != str(other)
+
 
 class EndUseOptions(GeophiresInputEnum):
     ELECTRICITY = 1, "Electricity"
@@ -111,6 +114,7 @@ class ReservoirModel(GeophiresInputEnum):
     USER_PROVIDED_PROFILE = 5, "User-Provided Temperature Profile"
     TOUGH2_SIMULATOR = 6, "TOUGH2 Simulator"
     SUTRA = 7, "SUTRA"
+    SBT = 8, "SBT"
 
     @staticmethod
     def get_reservoir_model_from_input_string(input_string:str):
@@ -174,9 +178,6 @@ class WellDrillingCostCorrelation(GeophiresInputEnum):
     DEVIATED_SMALL_IDEAL = 15, "deviated liner, small diameter, ideal", 0.00719, 455.85233, 753377.73080
     VERTICAL_LARGE_IDEAL = 16, "vertical open-hole, large diameter, ideal", -0.00240, 752.93946, 524337.65380
     DEVIATED_LARGE_IDEAL = 17, "deviated liner, large diameter, ideal", 0.00376, 762.52696, 765103.07690
-
-    def calculate_cost_MUSD(self, meters) -> float:
-        return (self._c2 * meters ** 2 + self._c1 * meters + self._c0) * 1E-6
 
     def __init__(self, int_value: int, _: str, c2: float, c1: float, c0: float):
         self._c2 = c2
@@ -249,6 +250,7 @@ class Configuration(GeophiresInputEnum):
     COAXIAL = 2, "coaxial"
     VERTICAL = 3, "vertical"
     L = 4, "L"
+    EAVORLOOP = 5, "EavorLoop"
 
     @staticmethod
     def from_int(int_val):
@@ -263,3 +265,40 @@ class Configuration(GeophiresInputEnum):
                 return member
 
         raise ValueError(f'Unknown Configuration input value: {input_string}')
+
+
+class FlowrateModel(GeophiresInputEnum):
+    USER_SUPPLIED = 1, "user supplied"
+    FILE_SUPPLIED = 2, "file supplied"
+
+    @staticmethod
+    def from_int(int_val):
+        for member in __class__:
+            if member.int_value == int_val:
+                return member
+
+    @staticmethod
+    def from_input_string(input_string: str):
+        for member in __class__:
+            if input_string == str(member.int_value):
+                return member
+
+        raise ValueError(f'Unknown Flow Rate Model input value: {input_string}')
+
+class InjectionTemperatureModel(GeophiresInputEnum):
+    USER_SUPPLIED = 1, "user supplied"
+    FILE_SUPPLIED = 2, "file supplied"
+
+    @staticmethod
+    def from_int(int_val):
+        for member in __class__:
+            if member.int_value == int_val:
+                return member
+
+    @staticmethod
+    def from_input_string(input_string: str):
+        for member in __class__:
+            if input_string == str(member.int_value):
+                return member
+
+        raise ValueError(f'Unknown Injection Temperature Model input value: {input_string}')

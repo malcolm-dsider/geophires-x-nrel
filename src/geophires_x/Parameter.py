@@ -19,6 +19,7 @@ from geophires_x.OptionList import GeophiresInputEnum
 from geophires_x.Units import *
 
 _ureg = get_unit_registry()
+_DISABLE_FOREX_API = True  # See https://github.com/NREL/GEOPHIRES-X/issues/236#issuecomment-2414681434
 
 class HasQuantity(ABC):
 
@@ -43,6 +44,7 @@ class ParameterEntry:
     Name: str
     sValue: str
     Comment: Optional[str] = None
+    raw_entry: Optional[str] = None
 
 
 @dataclass
@@ -75,7 +77,7 @@ class OutputParameter(HasQuantity):
 
     def with_preferred_units(self) -> Any:  # Any is a proxy for Self
         ret: OutputParameter = dataclasses.replace(self)
-        ret.value = ret.quantity().to(ret.PreferredUnits).magnitude
+        ret.value = ret.quantity().to(convertible_unit(ret.PreferredUnits)).magnitude
         ret.CurrentUnits = ret.PreferredUnits
         return ret
 
@@ -253,10 +255,10 @@ def ReadParameter(ParameterReadIn: ParameterEntry, ParamToModify, model):
     """
     ReadParameter: A method to take a single ParameterEntry object and use it to update the associated Parameter.
     Does validation as well as Unit and Currency conversion
-    :param ParameterEntry: The value the user wants to change and the value they want to change it to (as a string)
+    :param ParameterReadIn: The value the user wants to change and the value they want to change it to (as a string)
      and  any comment they provided with it (as a string) - all in one object (ParameterEntry) that is passed in
       to this method as a parameter itself (ParameterReadIn) - see ParameterEntry class for details on the fields in it
-    :type ParameterEntry: :class:`~geophires_x.Parameter.ParameterEntry`
+    :type ParameterReadIn: :class:`~geophires_x.Parameter.ParameterEntry`
     :param ParamToModify: The Parameter that will be modified (assuming it passes validation and conversion) - this is
       the object that will be modified by this method - see Parameter class for details on the fields in it
     :type ParamToModify: :class:`~geophires_x.Parameter.Parameter`
@@ -293,9 +295,9 @@ def ReadParameter(ParameterReadIn: ParameterEntry, ParamToModify, model):
 
     def default_parameter_value_message(new_val: Any, param_to_modify_name: str, default_value: Any) -> str:
         return (
-            f'Parameter given ({str(New_val)}) for {ParamToModify.Name} is the same as the default value. '
-            f'Consider removing {ParamToModify.Name} from the input file unless you wish '
-            f'to change it from the default value of ({str(ParamToModify.DefaultValue)})'
+            f'Parameter given ({str(new_val)}) for {param_to_modify_name} is the same as the default value. '
+            f'Consider removing {param_to_modify_name} from the input file unless you wish '
+            f'to change it from the default value of ({str(default_value)})'
         )
 
     if isinstance(ParamToModify, intParameter):
@@ -370,16 +372,23 @@ def ReadParameter(ParameterReadIn: ParameterEntry, ParamToModify, model):
                 model.logger.warning(msg)
             model.logger.info(f'Complete {str(__name__)}: {sys._getframe().f_code.co_name}')
             return
-        # All is good.  With a list, we have to use the last character of the Description to get the position.
-        # I.e., "Gradient 1" should yield a position = 0 ("1" - 1)
         else:
-            parts = ParameterReadIn.Name.split(' ')
-            position = int(parts[1]) - 1
-            if position >= len(ParamToModify.value):
-                ParamToModify.value.append(New_val)  # we are adding to the list, so use append
-            else:  # we are replacing a value, so pop the value we want to replace, then insert a new one
-                ParamToModify.value.pop(position)
-                ParamToModify.value.insert(position, New_val)
+            if ' ' in ParamToModify.Name:
+                # Some list parameters are read in with enumerated parameter names;  in these cases we use the last
+                # character of the description to get the position i.e., "Gradient 1" is position 0.
+                parts = ParameterReadIn.Name.split(' ')
+                position = int(parts[1]) - 1
+                if position >= len(ParamToModify.value):
+                    ParamToModify.value.append(New_val)  # we are adding to the list, so use append
+                else:  # we are replacing a value, so pop the value we want to replace, then insert a new one
+                    ParamToModify.value.pop(position)
+                    ParamToModify.value.insert(position, New_val)
+            else:
+                # In an ideal world this would be handled in ParameterEntry such that its sValue and Comment are
+                # correct; however that would only be practical if ParameterEntry had typing information to know
+                # whether to treat text after a second comma as a comment or list entry.
+                ParamToModify.value = [float(x.strip()) for x in ParameterReadIn.raw_entry.split('--')[0].split(',')[1:]
+                                       if x.strip() != '']
     elif isinstance(ParamToModify, boolParameter):
         if ParameterReadIn.sValue == "0":
             New_val = False
@@ -492,15 +501,19 @@ def ConvertUnits(ParamToModify, strUnit: str, model) -> str:
 
         try:
             # if we come here, we have a currency conversion to do (USD->EUR, etc.).
+
+            if _DISABLE_FOREX_API:
+                raise RuntimeError('Forex API disabled')
+
             cr = CurrencyRates()
             conv_rate = cr.get_rate(currShort, prefShort)
         except BaseException as ex:
             print(str(ex))
             msg = (
-                f'Error: GEOPHIRES failed to convert your currency for {ParamToModify.Name} to something it '
-                f'understands. You gave {strUnit} - Are these currency units defined for forex-python? or perhaps the '
-                f'currency server is down?  Please change your units to {ParamToModify.PreferredUnits.value} to '
-                f'continue. Cannot continue unless you do.  Exiting.'
+                f'Error: GEOPHIRES failed to convert your currency for {ParamToModify.Name} to something it understands. '
+                f'You gave {strUnit} - conversion may be affected by https://github.com/NREL/GEOPHIRES-X/issues/236. '
+                f'Please change your units to {ParamToModify.PreferredUnits.value} '
+                f'to continue. Cannot continue unless you do. Exiting.'
             )
             print(msg)
             model.logger.critical(str(ex))
@@ -601,7 +614,7 @@ def ConvertUnitsBack(ParamToModify: Parameter, model):
     model.logger.info(f'Init {str(__name__)}: {sys._getframe().f_code.co_name} for {ParamToModify.Name}')
 
     try:
-        ParamToModify.value = _ureg.Quantity(ParamToModify.value, ParamToModify.CurrentUnits.value).to(ParamToModify.PreferredUnits.value).magnitude
+        ParamToModify.value = _ureg.Quantity(ParamToModify.value, convertible_unit(ParamToModify.CurrentUnits)).to(convertible_unit(ParamToModify.PreferredUnits)).magnitude
         ParamToModify.CurrentUnits = ParamToModify.PreferredUnits
     except AttributeError as ae:
         # TODO refactor to check for/convert currency instead of relying on try/except once currency conversion is
@@ -702,6 +715,9 @@ def _parameter_with_currency_units_converted_back_to_preferred_units(param: Para
         # start the currency conversion process
         cc = CurrencyCodes()
         try:
+            if _DISABLE_FOREX_API:
+                raise RuntimeError('Forex API disabled')
+
             cr = CurrencyRates()
             conv_rate = cr.get_rate(currType, prefType)
         except BaseException as ex:
@@ -723,7 +739,7 @@ def _parameter_with_currency_units_converted_back_to_preferred_units(param: Para
 
     else:
         raise AttributeError(
-            f'Unit/unit type ({param.CurrentUnits}/{param.UnitType} for {param.Name} '
+            f'Unit/unit type ({param.CurrentUnits}/{param.UnitType}) for {param.Name} '
             f'is not a recognized currency unit'
         )
 
@@ -840,7 +856,7 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
     """
 
     try:
-        oparam.value = _ureg.Quantity(oparam.value, oparam.CurrentUnits.value).to(newUnit.value).magnitude
+        oparam.value = _ureg.Quantity(oparam.value, oparam.CurrentUnits.value).to(convertible_unit(newUnit.value)).magnitude
         oparam.CurrentUnits = newUnit
         return
     except AttributeError as ae:
@@ -958,6 +974,9 @@ def ConvertOutputUnits(oparam: OutputParameter, newUnit: Units, model):
 
             raise RuntimeError(msg)
         try:
+            if _DISABLE_FOREX_API:
+                raise RuntimeError('Forex API disabled')
+
             cr = CurrencyRates()
             conv_rate = cr.get_rate(prefShort, currShort)
         except BaseException as ex:

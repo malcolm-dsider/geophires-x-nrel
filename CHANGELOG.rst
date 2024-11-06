@@ -5,12 +5,34 @@ Changelog
 GEOPHIRES-X (2023-2024)
 ------------------------
 
+3.6
+^^^
+
+`release <https://github.com/NREL/GEOPHIRES-X/releases/tag/v3.6.0>`__ | `diff <https://github.com/NREL/GEOPHIRES-X/compare/v3.5.0...v3.6.0>`__
+
+Changes default output file path to the original working directory instead of the the GEOPHIRES module source directory (usually ``geophires-x`` or ``src/geophires_x``, depending on package installation type).
+This affects:
+
+1. Users who call GEOPHIRES as a script from a working directory outside of the module source directory and pass no output file argument or a non-absolute output file argument e.g. ``python ./geophires-x/GEOPHIRESv3.py my-input.txt``. In prior versions, the output file would have been generated at ``./geophires_x/HDR.out``; in v.3.6 it is generated at ``./HDR.out`` instead. (Users who call GEOPHIRES as a module – ``python -m geophires_x my-input.txt`` – will see no change since the module has always output relative to the working directory.)
+
+2. Inputs with ``HTML Output File`` and/or ``Improved Text Output File`` parameters specified as non-absolute paths. The associated output files will now be generated relative to the working directory instead of the GEOPHIRES module source directory.
+
+
+Affected users who do not want the new behavior can specify absolute output paths instead of relative ones e.g. ``python ./geophires-x/GEOPHIRESv3.py my-input.txt /home/user/my-geophires-project/geophires-x/HDR.out``
+(Most users are expected to be unaffected.)
+
+3.6.1: Fixed Internal Rate default value changed to 7% from 6.25% per https://github.com/NREL/GEOPHIRES-X/issues/301
+
+3.6.3: Discount Rate and Fixed Internal Rate are now synonymous. If one is provided, the other's value will be automatically set to the same value.
+
 3.5
 ^^^
 
 `release <https://github.com/NREL/GEOPHIRES-X/releases/tag/v3.5.0>`__ | `diff <https://github.com/NREL/GEOPHIRES-X/compare/v3.4.0...v3.5.0>`__
 
 Milestone version for case studies, SHR temperatures, and other changes since 3.0.
+
+3.5.3: SBT Reservoir Model (Slender Body Theory)
 
 3.4
 ^^^

@@ -1,11 +1,13 @@
 # copyright, 2023, Malcolm I Ross
 from enum import IntEnum, Enum, auto
+from typing import Any
 
 import pint
 import os
 
-
 _UREG = None
+
+
 def get_unit_registry():
     global _UREG
     if _UREG is None:
@@ -14,11 +16,25 @@ def get_unit_registry():
 
     return _UREG
 
+
+def convertible_unit(unit: Any) -> Any:
+    """
+    pint can't handle '%' as a unit in python 3.8, so use this method when constructing quantities
+
+    :type unit: str|Enum
+    """
+    if unit == Units.PERCENT or unit == PercentUnit.PERCENT or unit == Units.PERCENT.value:
+        return 'percent'
+
+    return unit
+
+
 class Units(IntEnum):
     """All possible systems of measure"""
     NONE = auto()
     CHOICE = auto()
     LENGTH = auto()
+    ANGLE = auto()
     AREA = auto()
     VOLUME = auto()
     MASS = auto()
@@ -58,8 +74,15 @@ class Units(IntEnum):
     POWERPERUNITAREA = auto()
     HEATPERUNITVOLUME = auto()
     POWERPERUNITVOLUME = auto()
-    DECAY_RATE=auto()
-    INFLATION_RATE=auto()
+    DECAY_RATE = auto()
+    INFLATION_RATE = auto()
+    DYNAMIC_VISCOSITY = auto()
+
+
+class AngleUnit(str, Enum):
+    """Angle Units"""
+    DEGREES = "degrees"
+    RADIANS = "radians"
 
 
 class TemperatureUnit(str, Enum):
@@ -150,6 +173,7 @@ class EnergyFrequencyUnit(str, Enum):
     MWhPERYEAR = "MWh/year"
     GWhPERYEAR = "GWh/year"
 
+
 class CurrencyUnit(str, Enum):
     """Currency Units"""
     MDOLLARS = "MUSD"
@@ -207,11 +231,12 @@ class CostPerDistanceUnit(str, Enum):
 
 class PressureUnit(str, Enum):
     """Pressure Units"""
-    MPASCAL = "mPa"
+    MPASCAL = "MPa"
     KPASCAL = "kPa"
     PASCAL = "Pa"
     BAR = "bar"
     KBAR = "kbar"
+    PSI = "psi"
 
 
 class AvailabilityUnit(str, Enum):
@@ -318,36 +343,41 @@ class MassUnit(str, Enum):
     OZ = "ounce"
 
 
-class PopDensityUnit(str,Enum):
+class PopDensityUnit(str, Enum):
     """Population Density Units"""
     perkm2 = "Population per square km"
 
 
-class HeatPerUnitAreaUnit(str,Enum):
+class HeatPerUnitAreaUnit(str, Enum):
     """Population Density Units"""
     KJPERSQKM = "kJ/km**2"
 
 
-class PowerPerUnitAreaUnit(str,Enum):
+class PowerPerUnitAreaUnit(str, Enum):
     """Population Density Units"""
     MWPERSQKM = "MW/km**2"
 
 
-class HeatPerUnitVolumeUnit(str,Enum):
+class HeatPerUnitVolumeUnit(str, Enum):
     """Population Density Units"""
     KJPERCUBICKM = "kJ/km**3"
 
 
-class PowerPerUnitVolumeUnit(str,Enum):
+class PowerPerUnitVolumeUnit(str, Enum):
     """Population Density Units"""
     MWPERCUBICKM = "MW/km**3"
 
 
-class Decay_RateUnit(str,Enum):
+class Decay_RateUnit(str, Enum):
     """Decay rate Units"""
     PERCENTPERYEAR = "%/yr"
 
 
-class Inflation_RateUnit(str,Enum):
+class Inflation_RateUnit(str, Enum):
     """Decay rate Units"""
     KPASCALPERYEAR = "kPa/yr"
+
+
+class Dynamic_ViscosityUnit(str, Enum):
+    """Dynamic Viscosity Units"""
+    PASCALSEC = "PaSec"

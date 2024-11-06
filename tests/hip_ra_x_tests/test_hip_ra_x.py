@@ -115,6 +115,13 @@ class HipRaXTestCase(BaseTestCase):
             },
         )
 
+    def test_result_parsing_3(self):
+        result = HipRaResult(self._get_test_file_path('hip-result_test-result-parsing-3.out'))
+        self.assertIsNone(result.result['Recoverable Fluid Factor']['unit'])
+        self.assertEqual(result.result['Recoverable Fluid Factor']['value'], 0.50)
+        self.assertEqual(result.result['Producible Heat/Unit Area (reservoir)']['value'], 1.37e13)
+        self.assertEqual(result.result['Producible Heat/Unit Area (reservoir)']['unit'], 'kJ/km**2')
+
     def test_calculate_reservoir_volume(self):
         """Calculates the volume of the reservoir"""
 
@@ -159,20 +166,6 @@ class HipRaXTestCase(BaseTestCase):
         for key in hip_ra.OutputParameterDict:
             param: OutputParameter = hip_ra.OutputParameterDict[key]
             assert param.CurrentUnits == param.PreferredUnits
-
-    @unittest.skip('FIXME WIP')
-    def test_aligns_space_between_value_and_units(self):
-        """
-        Assert that the space between value and units is aligned to the same column for each line in the output file
-        """
-
-        hip_ra = self._new_hip_ra_test_instance()
-        hip_ra.PrintOutputs()
-
-        with open('HIP.out') as f:
-            content = f.readlines()
-            for line in content:
-                assert line.count(' ') == 3
 
     @unittest.skip(reason='FIXME: Race condition if tests are run in parallel')
     def test_raises_permission_error(self):
@@ -380,8 +373,8 @@ class HipRaXTestCase(BaseTestCase):
         assert hip_ra.reservoir_temperature.PreferredUnits == TemperatureUnit.CELSIUS
         assert hip_ra.reservoir_temperature.CurrentUnits == TemperatureUnit.CELSIUS
         assert hip_ra.reservoir_temperature.Required is True
-        assert hip_ra.reservoir_temperature.ErrMessage == 'assume default reservoir temperature (150 deg-C)'
-        assert hip_ra.reservoir_temperature.ToolTipText == 'Reservoir Temperature [150 dec-C]'
+        assert hip_ra.reservoir_temperature.ErrMessage == 'assume default reservoir temperature (150 degC)'
+        assert hip_ra.reservoir_temperature.ToolTipText == 'Reservoir Temperature [150 degC]'
 
         assert hip_ra.rejection_temperature.value == 25.0
         assert hip_ra.reservoir_porosity.value == 18.0

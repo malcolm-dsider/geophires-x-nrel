@@ -22,6 +22,8 @@ from geophires_x.Parameter import ConvertUnitsBack, ConvertOutputUnits, LookupUn
 from geophires_x.OptionList import EndUseOptions, EconomicModel, ReservoirModel, FractureShape, ReservoirVolume, \
     PlantType
 from geophires_x.GeoPHIRESUtils import UpgradeSymbologyOfUnits, render_default, InsertImagesIntoHTML
+from geophires_x.Parameter import Parameter
+from geophires_x.Units import convertible_unit, Units, PercentUnit
 
 NL = '\n'
 validFilenameChars = "-_.() %s%s" % (string.ascii_letters, string.digits)
@@ -635,28 +637,34 @@ class Outputs:
     """
     This class handles all the outputs for the GEOPHIRESv3 model.
     """
+
     def __init__(self, model:Model, output_file:str ='HDR.out'):
         model.logger.info(f'Init {__class__!s}: {__name__}')
         self.ParameterDict = {}
         self.OutputParameterDict = {}
+        self.filepath_parameter_names = []
 
-        self.text_output_file = self.ParameterDict[self.text_output_file.Name] = strParameter(
+        def filepath_parameter(p: Parameter) -> Parameter:
+            self.filepath_parameter_names.append(p.Name)
+            return p
+
+        self.text_output_file = self.ParameterDict[self.text_output_file.Name] = filepath_parameter(strParameter(
                 'Improved Text Output File',
                 DefaultValue='GEOPHIRES_Text.html',
                 Required=False,
                 Provided=False,
                 ErrMessage='assume no improved text output',
                 ToolTipText='Provide a improved text output name if you want to have improved text output (no output if not provided)',
-            )
+        ))
 
-        self.html_output_file = self.ParameterDict[self.html_output_file.Name] = strParameter(
+        self.html_output_file = self.ParameterDict[self.html_output_file.Name] = filepath_parameter(strParameter(
                 'HTML Output File',
                 DefaultValue='GEOPHIRES.html',
                 Required=False,
                 Provided=False,
                 ErrMessage='assume no HTML output',
                 ToolTipText='Provide a HTML output name if you want to have HTML output (no output if not provided)',
-            )
+        ))
 
         self.printoutput = self.ParameterDict[self.printoutput.Name] = boolParameter(
                 'Print Output to Console',
@@ -677,7 +685,7 @@ class Outputs:
     def __str__(self):
         return 'Outputs'
 
-    def read_parameters(self, model:Model) -> None:
+    def read_parameters(self, model: Model, default_output_path: Path = None) -> None:
         """
         The read_parameters function reads in the parameters from a dictionary and stores them in the parameters.
         It also handles special cases that need to be handled after a value has been read in and checked.
@@ -692,6 +700,8 @@ class Outputs:
         to call this method from you class, which can effectively modify all these superclass parameters in your class.
         :param model: The container class of the application, giving access to everything else, including the logger
         :type model: :class:`~geophires_x.Model.Model`
+        :param default_output_path: Relative path for non-absolute output path parameters
+        :type default_output_path: pathlib.Path
         :return: None
         """
         model.logger.info(f'Init {__class__!s}: {__name__}')
@@ -702,6 +712,15 @@ class Outputs:
                 key = ParameterToModify.Name.strip()
                 if key in model.InputParameters:
                     ParameterReadIn = model.InputParameters[key]
+
+                    if key in self.filepath_parameter_names:
+                        if not Path(ParameterReadIn.sValue).is_absolute() and default_output_path is not None:
+                            original_val = ParameterReadIn.sValue
+                            ParameterReadIn.sValue = str(
+                                default_output_path.joinpath(Path(ParameterReadIn.sValue)).absolute())
+                            model.logger.info(f'Adjusted {key} path to {ParameterReadIn.sValue} because original value '
+                                              f'({original_val}) was not an absolute path.')
+
                     # Before we change the parameter, let's assume that the unit preferences will match
                     # - if they don't, the later code will fix this.
                     ParameterToModify.CurrentUnits = ParameterToModify.PreferredUnits
@@ -724,19 +743,9 @@ class Outputs:
                 if key.startswith('Units:'):
                     self.ParameterDict[key.replace('Units:', '')] = LookupUnits(model.InputParameters[key].sValue)[0]
 
-                    # handle special cases
-
         model.logger.info(f'Complete {__class__!s}: {__name__}')
 
-    def PrintOutputs(self, model: Model):
-        """
-        PrintOutputs writes the standard outputs to the output file.
-        :param model: The container class of the application, giving access to everything else, including the logger
-        :type model: :class:`~geophires_x.Model.Model`
-        :return: None
-        """
-        model.logger.info(f'Init {str(__class__)}: {sys._getframe().f_code.co_name}')
-
+    def _convert_units(self, model: Model):
         # Deal with converting Units back to PreferredUnits, if required.
         # before we write the outputs, we go thru all the parameters for all of the objects and set the values back
         # to the units that the user entered the data in
@@ -762,6 +771,17 @@ class Outputs:
                         ConvertOutputUnits(output_param, self.ParameterDict[key], model)
                 elif not output_param.UnitsMatch:
                     obj.OutputParameterDict[key] = output_param.with_preferred_units()
+
+    def PrintOutputs(self, model: Model):
+        """
+        PrintOutputs writes the standard outputs to the output file.
+        :param model: The container class of the application, giving access to everything else, including the logger
+        :type model: :class:`~geophires_x.Model.Model`
+        :return: None
+        """
+        model.logger.info(f'Init {str(__class__)}: {sys._getframe().f_code.co_name}')
+
+        self._convert_units(model)
 
         #data structures and assignments for HTML and Improved Text Output formats
         simulation_metadata = []
@@ -1618,7 +1638,8 @@ class Outputs:
                     f.write(f'      Fixed Charge Rate (FCR):                          {model.economics.FCR.value*100.0:10.2f} ' + model.economics.FCR.CurrentUnits.value + NL)
                 elif model.economics.econmodel.value == EconomicModel.STANDARDIZED_LEVELIZED_COST:
                     f.write('      Economic Model = ' + model.economics.econmodel.value.value + NL)
-                    f.write(f'      Interest Rate:                                    {model.economics.discountrate.value*100.0:10.2f} ' + model.economics.discountrate.CurrentUnits.value + NL)
+                    f.write(f'      {model.economics.interest_rate.Name}:                                    {model.economics.interest_rate.value:10.2f} {model.economics.interest_rate.CurrentUnits.value}\n')
+
                 elif model.economics.econmodel.value == EconomicModel.BICYCLE:
                     f.write('      Economic Model  = ' + model.economics.econmodel.value.value + NL)
                 f.write(f'      Accrued financing during construction:            {model.economics.inflrateconstruction.value*100:10.2f} ' + model.economics.inflrateconstruction.CurrentUnits.value + NL)
@@ -1788,10 +1809,10 @@ class Outputs:
                             model.economics.cost_one_injection_well.value != -1:
                         f.write(f'             Drilling and completion costs per production well:   {econ.cost_one_production_well.value:10.2f} ' + econ.cost_one_production_well.CurrentUnits.value + NL)
                         f.write(f'             Drilling and completion costs per injection well:    {econ.cost_one_injection_well.value:10.2f} ' + econ.cost_one_injection_well.CurrentUnits.value + NL)
-                    elif econ.cost_nonvertical_section.value > 0.0:
+                    elif econ.cost_lateral_section.value > 0.0:
                         f.write(f'             Drilling and completion costs per vertical production well:   {econ.cost_one_production_well.value:10.2f} ' + econ.cost_one_production_well.CurrentUnits.value + NL)
                         f.write(f'             Drilling and completion costs per vertical injection well:    {econ.cost_one_injection_well.value:10.2f} ' + econ.cost_one_injection_well.CurrentUnits.value + NL)
-                        f.write(f'             Drilling and completion costs per non-vertical sections:      {econ.cost_nonvertical_section.value:10.2f} ' + econ.cost_nonvertical_section.CurrentUnits.value + NL)
+                        f.write(f'             Drilling and completion costs per non-vertical sections:      {econ.cost_lateral_section.value:10.2f} ' + econ.cost_lateral_section.CurrentUnits.value + NL)
                     else:
                         f.write(f'         Drilling and completion costs per well:        {model.economics.Cwell.value/(model.wellbores.nprod.value+model.wellbores.ninj.value):10.2f} ' + model.economics.Cwell.CurrentUnits.value + NL)
                     f.write(f'         Stimulation costs:                             {model.economics.Cstim.value:10.2f} ' + model.economics.Cstim.CurrentUnits.value + NL)

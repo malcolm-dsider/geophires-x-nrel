@@ -1,3 +1,4 @@
+import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -166,6 +167,7 @@ class GeophiresXTestCase(BaseTestCase):
         )
 
         assert len(example_files) > 0  # test integrity check - no files means something is misconfigured
+        regenerate_cmds = []
         for example_file_path in example_files:
             with self.subTest(msg=example_file_path):
                 print(f'Running example test {example_file_path}')
@@ -193,6 +195,15 @@ class GeophiresXTestCase(BaseTestCase):
                         'Wanju_Yuan_Closed-Loop_Geothermal_Energy_Recovery.txt',
                     ]
                     allow_almost_equal = example_file_path in cases_to_allow_almost_equal
+
+                    cmd_script = (
+                        './tests/regenerate-example-result.sh'
+                        if os.name != 'nt'
+                        else './tests/regenerate-example-result.ps1'
+                    )
+                    regenerate_cmd = f'{cmd_script} {example_file_path.split(".")[0]}'
+                    regenerate_cmds.append(regenerate_cmd)
+
                     if allow_almost_equal:
                         log.warning(
                             f"Results aren't exactly equal in {example_file_path}, falling back to almostEqual..."
@@ -203,20 +214,23 @@ class GeophiresXTestCase(BaseTestCase):
                             places=1,
                             msg=f'Example test: {example_file_path}',
                         )
+                        regenerate_cmds.pop()
                     else:
-                        msg = 'Results are not approximately equal within any percentage <100'
+
+                        msg = 'Results are not approximately equal within any percentage <100.'
                         percent_diff = self._get_unequal_dicts_approximate_percent_difference(
                             expected_result.result, geophires_result.result
                         )
 
                         if percent_diff is not None:
-                            msg = (
-                                f'Results are approximately equal within {percent_diff}%. '
-                                f'(Run `./tests/regenerate-example-result.sh {example_file_path.split(".")[0]}` '
-                                f'if this difference is expected due to calculation updates)'
-                            )
+                            msg = f'Results are approximately equal within {percent_diff}%.'
+
+                        msg += f' (Run `{regenerate_cmd}` if this is expected due to calculation updates)'
 
                         raise AssertionError(msg) from ae
+
+        if len(regenerate_cmds) > 0:
+            print(f'Command to regenerate {len(regenerate_cmds)} failed examples:\n{" && ".join(regenerate_cmds)}')
 
     def _get_unequal_dicts_approximate_percent_difference(self, d1: dict, d2: dict) -> Optional[float]:
         for i in range(99):
@@ -473,3 +487,97 @@ Print Output to Console, 1"""
 
         self.assertEqual(result.result['RESERVOIR PARAMETERS']['Fracture width']['value'], 320.0)
         self.assertEqual(result.result['RESERVOIR PARAMETERS']['Fracture width']['unit'], 'meter')
+
+    def test_convert_output_psi_to_kpa(self):
+        GeophiresXClient().get_geophires_result(
+            GeophiresInputParameters(
+                from_file_path=self._get_test_file_path(Path('examples/example_SHR-2.txt')),
+                params={
+                    'Production Wellhead Pressure': '64.69 psi',
+                },
+            )
+        )
+
+        # TODO validate output values (for now we are just testing an exception isn't thrown)
+
+    def test_multilateral_section_nonvertical_length(self):
+        def s(r):
+            del r.result['metadata']
+            del r.result['Simulation Metadata']
+            return r
+
+        deprecated_param = s(
+            GeophiresXClient().get_geophires_result(
+                GeophiresInputParameters(
+                    from_file_path=self._get_test_file_path(Path('multilateral-section-nonvertical-length.txt')),
+                    params={'Total Nonvertical Length': 6000.0},
+                )
+            )
+        )
+
+        non_deprecated_param = s(
+            GeophiresXClient().get_geophires_result(
+                GeophiresInputParameters(
+                    from_file_path=self._get_test_file_path(Path('multilateral-section-nonvertical-length.txt')),
+                    params={'Nonvertical Length per Multilateral Section': 6000.0},
+                )
+            )
+        )
+
+        self.assertDictEqual(deprecated_param.result, non_deprecated_param.result)
+
+        both_params = s(
+            GeophiresXClient().get_geophires_result(
+                GeophiresInputParameters(
+                    from_file_path=self._get_test_file_path(Path('multilateral-section-nonvertical-length.txt')),
+                    params={'Nonvertical Length per Multilateral Section': 6000.0, 'Total Nonvertical Length': 4000.0},
+                )
+            )
+        )
+
+        # deprecated is ignored if both are present.
+        self.assertDictEqual(both_params.result, non_deprecated_param.result)
+
+    def test_discount_rate_and_fixed_internal_rate(self):
+        def input_params(discount_rate=None, fixed_internal_rate=None):
+            params = {
+                'End-Use Option': EndUseOption.ELECTRICITY.value,
+                'Reservoir Model': 1,
+                'Reservoir Depth': 3,
+                'Gradient 1': 50,
+            }
+
+            if discount_rate is not None:
+                params['Discount Rate'] = discount_rate
+
+            if fixed_internal_rate is not None:
+                params['Fixed Internal Rate'] = fixed_internal_rate
+
+            return GeophiresInputParameters(params)
+
+        client = GeophiresXClient()
+
+        # noinspection PyPep8Naming
+        def assertHasLogRecordWithMessage(logs_, message):
+            assert message in [record.message for record in logs_.records]
+
+        with self.assertLogs(level='INFO') as logs:
+            result = client.get_geophires_result(input_params(discount_rate='0.042'))
+
+            assert result is not None
+            assert result.result['ECONOMIC PARAMETERS']['Interest Rate']['value'] == 4.2
+            assert result.result['ECONOMIC PARAMETERS']['Interest Rate']['unit'] == '%'
+            assertHasLogRecordWithMessage(
+                logs, 'Set Fixed Internal Rate to 4.2 percent because Discount Rate was provided (0.042)'
+            )
+
+        with self.assertLogs(level='INFO') as logs2:
+            result2 = client.get_geophires_result(input_params(fixed_internal_rate='4.2'))
+
+            assert result2 is not None
+            assert result2.result['ECONOMIC PARAMETERS']['Interest Rate']['value'] == 4.2
+            assert result2.result['ECONOMIC PARAMETERS']['Interest Rate']['unit'] == '%'
+
+            assertHasLogRecordWithMessage(
+                logs2, 'Set Discount Rate to 0.042 because Fixed Internal Rate was provided (4.2 percent)'
+            )

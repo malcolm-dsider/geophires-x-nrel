@@ -6,13 +6,22 @@ tests/__pycache__
 # requirements defined in setup.py
 requirements.txt
 
-# Temp files
+# Temp/output files
 .*.sw[po]
 *~
 *.bak
 .DS_Store
 *.lock
 *.json
+all_messages_conf.log
+HDR.out
+src/geophires_x/*.png
+src/geophires_x/*.html
+*HEATING_COOLING*.png
+*CASHFLOW_PROFILE*.png
+Geothermal_district_heating_system_with_peaking_boilers.png
+*.html
+!docs/*.html
 
 # C extensions
 *.so
@@ -81,6 +90,8 @@ docs/reference/geophires-request.json
 docs/reference/parameters.rst
 docs/geophires-request.json
 docs/parameters.rst
+docs/hip-ra-x-request.json
+docs/hip_ra_x_parameters.rst
 _site/
 /docs/geophires_x.rstx
 /docs/temperature.txt
