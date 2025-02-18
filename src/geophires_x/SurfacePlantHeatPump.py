@@ -41,7 +41,7 @@ class SurfacePlantHeatPump(SurfacePlant):
 
         self.heat_pump_cop = self.ParameterDict[self.heat_pump_cop.Name] = floatParameter(
             "Heat Pump COP",
-            value=5,
+            DefaultValue=5,
             Min=1,
             Max=10,
             UnitType=Units.PERCENT,
@@ -131,4 +131,5 @@ class SurfacePlantHeatPump(SurfacePlant):
         self.RemainingReservoirHeatContent.value = SurfacePlant.remaining_reservoir_heat_content(
             self, model.reserv.InitialReservoirHeatContent.value, self.HeatkWhExtracted.value)
 
-        model.logger.info("complete " + str(__class__) + ": " + inspect.currentframe().f_code.co_name)
+        self._calculate_derived_outputs(model)
+        model.logger.info(f"complete {str(__class__)}: {inspect.currentframe().f_code.co_name}")

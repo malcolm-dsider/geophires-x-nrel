@@ -189,7 +189,7 @@ class AGSEconomics(Economics.Economics):
             # use the CLGS-Style economic calculations
             err = self.verify(model)
             if err > 0:
-                msg = 'Error: GEOPHIRES failed to Failed to validate CLGS input value. Exiting....'
+                msg = 'Error: GEOPHIRES failed to validate CLGS input value. Exiting...'
                 print(msg)
                 raise RuntimeError(msg)
 
@@ -259,5 +259,6 @@ class AGSEconomics(Economics.Economics):
             self.Coam.value = self.AverageOPEX_Plant * 1000
             self.Coam.CurrentUnits = CurrencyFrequencyUnit.KDOLLARSPERYEAR
 
+        self._calculate_derived_outputs(model)
         model.logger.info(f'complete {__class__!s}: {sys._getframe().f_code.co_name}')
 

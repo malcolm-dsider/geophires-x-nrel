@@ -43,7 +43,7 @@ class GeophiresXResult:
                 'Number of injection wells',
                 'Flowrate per production well',
                 'Well depth',
-                'Well depth (or total length, if not vertical)',
+                'Well depth (or total length, if not vertical)',  # deprecated
                 'Geothermal gradient',
                 'Segment 1   Geothermal gradient',
                 'Segment 1   Thickness',
@@ -101,7 +101,8 @@ class GeophiresXResult:
             'ENGINEERING PARAMETERS': [
                 'Number of Production Wells',
                 'Number of Injection Wells',
-                'Well depth (or total length, if not vertical)',
+                'Well depth',
+                'Well depth (or total length, if not vertical)',  # deprecated
                 'Water loss rate',  # %
                 'Pump efficiency',  # %
                 'Injection temperature',
@@ -195,17 +196,23 @@ class GeophiresXResult:
                 'Drilling and completion costs per injection well',
                 'Drilling and completion costs per vertical production well',
                 'Drilling and completion costs per vertical injection well',
-                'Drilling and completion costs per non - vertical sections',
+                'Drilling and completion costs per non-vertical section',
+                'Drilling and completion costs (for redrilling)',
+                'Drilling and completion costs per redrilled well',
                 'Stimulation costs',
+                'Stimulation costs (for redrilling)',
                 'Surface power plant costs',
                 'of which Absorption Chiller Cost',
                 'of which Heat Pump Cost',
                 'of which Peaking Boiler Cost',
+                'Transmission pipeline cost',
                 'District Heating System Cost',
                 'Field gathering system costs',
                 'Total surface equipment costs',
                 'Exploration costs',
+                'Investment Tax Credit',
                 'Total capital costs',
+                'Annualized capital costs',
                 # AGS/CLGS
                 'Total CAPEX',
                 'Drilling Cost',
@@ -270,9 +277,10 @@ class GeophiresXResult:
                 'Maximum Peaking Boiler Heat Production',
                 'Average Peaking Boiler Heat Production',
                 'Minimum Peaking Boiler Heat Production',
+                'Initial pumping power/net installed power',
+                'Heat to Power Conversion Efficiency',
                 # AGS/CLGS
                 'Surface Plant Cost',
-                'Initial pumping power/net installed power',
                 # SUTRA
                 'Average RTES Heating Production',
                 'Average Auxiliary Heating Production',
@@ -651,6 +659,9 @@ class GeophiresXResult:
         return data
 
     def _parse_number(self, number_str, field='string') -> int | float:
+        if number_str == 'N/A':
+            return None
+
         try:
             if '.' in number_str:
                 # TODO should probably ideally use decimal.Decimal to preserve precision,

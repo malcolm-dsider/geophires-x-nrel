@@ -107,7 +107,7 @@
       "maximum": 15
     },
     "Maximum Temperature": {
-      "description": "Maximum allowable reservoir temperature (e.g. due to drill bit or logging tools constraints).             GEOPHIRES will cap the drilling depth to stay below this maximum temperature.",
+      "description": "Maximum allowable reservoir temperature (e.g. due to drill bit or logging tools constraints). GEOPHIRES will cap the drilling depth to stay below this maximum temperature.",
       "type": "number",
       "units": "degC",
       "category": "Reservoir",
@@ -396,7 +396,7 @@
       "maximum": 0.99
     },
     "Surface Temperature": {
-      "description": "Surface temperature used for calculating bottom-hole temperature             (with geothermal gradient and reservoir depth)",
+      "description": "Surface temperature used for calculating bottom-hole temperature (with geothermal gradient and reservoir depth)",
       "type": "number",
       "units": "degC",
       "category": "Reservoir",
@@ -726,7 +726,7 @@
       "category": "Well Bores",
       "default": 1.0,
       "minimum": 0.0,
-      "maximum": 1.000001
+      "maximum": "1.0"
     },
     "Is AGS": {
       "description": "Set to true if the model is for an Advanced Geothermal System (AGS)",
@@ -916,12 +916,12 @@
       "type": "integer",
       "units": null,
       "category": "Well Bores",
-      "default": 1,
+      "default": 0,
       "minimum": 0,
       "maximum": 100
     },
     "Multilaterals Cased": {
-      "description": "",
+      "description": "If set to True, casing & cementing are assumed to comprise 50% of drilling costs (doubling cost compared to uncased).",
       "type": "boolean",
       "units": null,
       "category": "Well Bores",
@@ -1392,7 +1392,7 @@
       "maximum": 200
     },
     "Well Drilling and Completion Capital Cost Adjustment Factor": {
-      "description": "Well Drilling and Completion Capital Cost Adjustment Factor",
+      "description": "Well Drilling and Completion Capital Cost Adjustment Factor. Applies to production wells; also applies to injection wells unless a value is provided for Injection Well Drilling and Completion Capital Cost Adjustment Factor.",
       "type": "number",
       "units": "",
       "category": "Economics",
@@ -1401,7 +1401,7 @@
       "maximum": 10
     },
     "Injection Well Drilling and Completion Capital Cost Adjustment Factor": {
-      "description": "Injection Well Drilling and Completion Capital Cost Adjustment Factor",
+      "description": "Injection Well Drilling and Completion Capital Cost Adjustment Factor. If not provided, this value will be set automatically to the same value as Well Drilling and Completion Capital Cost Adjustment Factor.",
       "type": "number",
       "units": "",
       "category": "Economics",
@@ -2086,7 +2086,7 @@
       "type": "number",
       "units": "%",
       "category": "Economics",
-      "default": 7.00,
+      "default": "7.0",
       "minimum": 0.0,
       "maximum": 100.0
     },

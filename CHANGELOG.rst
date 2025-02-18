@@ -2,8 +2,21 @@
 Changelog
 =========
 
-GEOPHIRES-X (2023-2024)
+GEOPHIRES-X (2023-2025)
 ------------------------
+
+3.7
+^^^
+
+`release <https://github.com/NREL/GEOPHIRES-X/releases/tag/v3.7.0>`__ | `diff <https://github.com/NREL/GEOPHIRES-X/compare/v3.6.0...v3.7.0>`__
+
+"Well depth (or total length, if not vertical)" output field renamed to "Well depth" per https://github.com/NREL/GEOPHIRES-X/issues/321
+
+3.7.3: Heat to Power Conversion Efficiency output added.
+
+3.7.5: Injection Well Drilling and Completion Capital Cost Adjustment Factor, if not provided, is now automatically set to the provided value of Well Drilling and Completion Capital Cost Adjustment Factor.
+
+3.7.6: Fixes bugs pertaining to specifying non-CLGS laterals and display of per-lateral costs.
 
 3.6
 ^^^
@@ -31,6 +44,7 @@ Affected users who do not want the new behavior can specify absolute output path
 `release <https://github.com/NREL/GEOPHIRES-X/releases/tag/v3.5.0>`__ | `diff <https://github.com/NREL/GEOPHIRES-X/compare/v3.4.0...v3.5.0>`__
 
 Milestone version for case studies, SHR temperatures, and other changes since 3.0.
+An overview is given in the July 2024 NREL GEOPHIRES Workshop `Version 3.5 Announcement session recording <https://youtu.be/Bi_l6y6_LQk>`__.
 
 3.5.3: SBT Reservoir Model (Slender Body Theory)
 

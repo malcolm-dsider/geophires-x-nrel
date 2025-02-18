@@ -510,8 +510,10 @@ def ProdPressureDropAndPumpingPowerUsingIndexes(
         # Minimum production pump inlet pressure and minimum wellhead pressure
         if Trock_degC < 373.9:
             Pminimum_kPa = vapor_pressure_water_kPa(Trock_degC) + Pexcess_kPa
-        else: #above the critical water temperature, vapor no longer occurs and vapor pressure can no longer be calculated. A "dummy" vapor pressure can be assumed as the fluid phase no longer impacts the pump depth.
-            Pminimum_kPa = 100 #setting artificially to 1 bar = 100 kPa
+        else:
+            # Above the critical water temperature, vapor no longer occurs and vapor pressure can no longer be
+            # calculated. A "dummy" vapor pressure can be assumed as the fluid phase no longer impacts the pump depth.
+            Pminimum_kPa = 100 # 1 bar = 100 kPa
 
         if usebuiltinppwellheadcorrelation:
             Pprodwellhead = Pminimum_kPa  # production wellhead pressure [kPa]
@@ -1028,10 +1030,10 @@ class WellBores:
         )
         self.numnonverticalsections = self.ParameterDict[self.numnonverticalsections.Name] = intParameter(
             "Number of Multilateral Sections",
-            DefaultValue=1,
+            DefaultValue=0,
             AllowableRange=list(range(0, 101, 1)),
             UnitType=Units.NONE,
-            ErrMessage="assume default for Number of Nonvertical Wellbore Sections (1)",
+            ErrMessage="assume default for Number of Nonvertical Wellbore Sections (0)",
             ToolTipText="Number of Nonvertical Wellbore Sections"
         )
         self.NonverticalsCased = self.ParameterDict[self.NonverticalsCased.Name] = boolParameter(
@@ -1040,7 +1042,9 @@ class WellBores:
             Required=False,
             Provided=False,
             Valid=True,
-            ErrMessage="assume default value (False)"
+            ErrMessage="assume default value (False)",
+            ToolTipText="If set to True, casing & cementing are assumed to comprise 50% of drilling costs "
+                        "(doubling cost compared to uncased)."
         )
 
         # local variable initiation
@@ -1254,9 +1258,6 @@ class WellBores:
                 key = ParameterToModify.Name.strip()
                 if key in model.InputParameters:
                     ParameterReadIn = model.InputParameters[key]
-                    # Before we change the parameter, let's assume that the unit preferences will match
-                    # - if they don't, the later code will fix this.
-                    ParameterToModify.CurrentUnits = ParameterToModify.PreferredUnits
                     ReadParameter(ParameterReadIn, ParameterToModify, model)  # this should handle all non-special cases
 
                     # handle special cases

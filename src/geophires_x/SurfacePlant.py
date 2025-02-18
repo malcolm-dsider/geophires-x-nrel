@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 
+from .GeoPHIRESUtils import quantity
 from .OptionList import EndUseOptions, PlantType
 from .Parameter import floatParameter, intParameter, strParameter, OutputParameter, ReadParameter, \
     coerce_int_params_to_enum_values
@@ -258,7 +259,7 @@ class SurfacePlant:
             Min=0.1,
             Max=1.0,
             UnitType=Units.PERCENT,
-            PreferredUnits=PercentUnit.TENTH,
+            PreferredUnits=PercentUnit.PERCENT,
             CurrentUnits=PercentUnit.TENTH,
             Required=True,
             ErrMessage="assume default circulation pump efficiency (0.75)",
@@ -340,7 +341,7 @@ class SurfacePlant:
             UnitType=Units.LENGTH,
             PreferredUnits=LengthUnit.KILOMETERS,
             CurrentUnits=LengthUnit.KILOMETERS,
-            ErrMessage="assume default piping length (5km)"
+            ErrMessage="assume default piping length (0km)"
         )
         self.plant_outlet_pressure = self.ParameterDict[self.plant_outlet_pressure.Name] = floatParameter(
             "Plant Outlet Pressure",
@@ -486,7 +487,16 @@ class SurfacePlant:
             Name="First Law Efficiency",
             UnitType=Units.PERCENT,
             PreferredUnits=PercentUnit.PERCENT,
-            CurrentUnits=PercentUnit.PERCENT
+            CurrentUnits=PercentUnit.PERCENT,  # FIXME default values are actually in tenths, not percent.
+            ToolTipText='Net electricity produced divided by heat extracted towards electricity'
+        )
+        self.heat_to_power_conversion_efficiency = self.OutputParameterDict[self.heat_to_power_conversion_efficiency.Name] = OutputParameter(
+            Name='Heat to Power Conversion Efficiency',
+            value=None,
+            UnitType=Units.PERCENT,
+            PreferredUnits=PercentUnit.PERCENT,
+            CurrentUnits=PercentUnit.PERCENT,
+            ToolTipText='First law efficiency average over project lifetime'
         )
         self.HeatExtracted = self.OutputParameterDict[self.HeatExtracted.Name] = OutputParameter(
             Name="Heat Extracted",
@@ -551,9 +561,7 @@ class SurfacePlant:
                 key = ParameterToModify.Name.strip()
                 if key in model.InputParameters:
                     ParameterReadIn = model.InputParameters[key]
-                    # Before we change the parameter, let's assume that the unit preferences will match -
-                    # if they don't, the later code will fix this.
-                    ParameterToModify.CurrentUnits = ParameterToModify.PreferredUnits
+
                     # this should handle all the non-special cases
                     ReadParameter(ParameterReadIn, ParameterToModify, model)
 
@@ -563,7 +571,6 @@ class SurfacePlant:
                         ParameterToModify.value = end_use_option
                         if end_use_option == EndUseOptions.HEAT:
                             self.plant_type.value = PlantType.INDUSTRIAL
-
                     elif ParameterToModify.Name == 'Power Plant Type':
                         ParameterToModify.value = PlantType.from_input_string(ParameterReadIn.sValue)
                         if self.enduse_option.value == EndUseOptions.ELECTRICITY:
@@ -639,4 +646,20 @@ class SurfacePlant:
 
         # All calculations are handled in subclasses of this class, so this function is empty.
 
+        # Subclasses should call _calculate_derived_outputs at the end of their Calculate methods.
+        self._calculate_derived_outputs(model)
+
         model.logger.info(f'Complete {self.__class__.__name__}: {__name__}')
+
+    def _calculate_derived_outputs(self, model: Model) -> None:
+        """
+        Subclasses should call _calculate_derived_outputs at the end of their Calculate methods to populate output
+        values that are derived from subclass-calculated outputs.
+        """
+
+        if self.FirstLawEfficiency is not None:
+            fle_unit = PercentUnit.TENTH  # See FIXME on self.FirstLawEfficiency re: CurrentUnit being incorrect.
+            avg_efficiency = quantity(np.average(model.surfaceplant.FirstLawEfficiency.value), fle_unit).to(
+                convertible_unit(self.heat_to_power_conversion_efficiency.CurrentUnits)).magnitude
+            if avg_efficiency > 0:  # 0 is presumed to mean N/A
+                self.heat_to_power_conversion_efficiency.value = avg_efficiency

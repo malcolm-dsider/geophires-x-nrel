@@ -392,6 +392,13 @@ class GeophiresXClientTestCase(BaseTestCase):
             ccus_profile,
         )
 
+    def test_non_vertical_section_cost(self):
+        result_path = self._get_test_file_path('examples/Fervo_Norbeck_Latimer_2023.out')
+        result = GeophiresXResult(result_path)
+        entry = result.result['CAPITAL COSTS (M$)']['Drilling and completion costs per non-vertical section']
+        self.assertIsNotNone(entry['value'])
+        self.assertEqual(entry['unit'], 'MUSD')
+
     @unittest.skip(
         'Not currently relevant - '
         'see TODO in geophires_x_client.geophires_input_parameters.GeophiresInputParameters.__hash__'
@@ -449,12 +456,13 @@ class GeophiresXClientTestCase(BaseTestCase):
 
     def test_csv(self):
         """
-        TODO make this less tedious to update when expected result values change
+        Note: example1_addons.csv will be updated automatically when `regenerate-example-result.sh example1_addons` is
+        run.
 
-        Current easiest method to update:
-         1. set breakpoint on line after `as_csv = result.as_csv()`
-         2. debug test, hit break point
-         3. copy-paste value of `as_csv` to example1_addons.csv
+        If needed, example1_addons.csv can also be updated manually with the following steps:
+         1. In your IDE, set a breakpoint on the line after `as_csv = result.as_csv()`
+         2. Debug this test and hit the break point
+         3. Copy-paste the value of `as_csv` (in Threads & Variables tab in PyCharm) to example1_addons.csv
         """
 
         def assertFileContentsEqual(expected_file_path, actual_file_path, tol=0.01):
@@ -511,3 +519,7 @@ class GeophiresXClientTestCase(BaseTestCase):
         self.assertEqual(
             result.result['ECONOMIC PARAMETERS']['CHP: Percent cost allocation for electrical plant']['value'], 93.48
         )
+
+    def test_parse_annualized_capital_costs(self):
+        result = GeophiresXResult(self._get_test_file_path('examples/example1_addons.out'))
+        self.assertIsNotNone(result.result['CAPITAL COSTS (M$)']['Annualized capital costs']['value'])

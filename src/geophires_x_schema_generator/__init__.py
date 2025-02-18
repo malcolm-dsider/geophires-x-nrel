@@ -34,7 +34,8 @@ class GeophiresXSchemaGenerator:
     def __init__(self):
         pass
 
-    def _get_dummy_model(self):
+    @staticmethod
+    def _get_dummy_model():
         stash_cwd = Path.cwd()
         stash_sys_argv = sys.argv
         sys.argv = ['']
@@ -112,7 +113,7 @@ class GeophiresXSchemaGenerator:
                 'type': param['json_parameter_type'],
                 'units': units_val,
                 'category': param['parameter_category'],
-                'default': param['DefaultValue'],
+                'default': _fix_floating_point_error(param['DefaultValue']),
                 'minimum': min_val,
                 'maximum': max_val,
             }
@@ -146,9 +147,9 @@ class GeophiresXSchemaGenerator:
 
             input_params_by_category[category][input_param_name] = input_param
 
-        def get_input_params_table(category_params, category_name) -> str:
+        def get_input_params_table(_category_params, category_name) -> str:
             category_display = category_name if category_name is not None else ''
-            input_rst = f"""
+            _input_rst = f"""
 {category_display}
 {'-' * len(category_display)}
     .. list-table:: {category_display}{' ' if len(category_display) > 0 else ''}Parameters
@@ -162,23 +163,25 @@ class GeophiresXSchemaGenerator:
          - Min
          - Max"""
 
-            for param_name in category_params:
+            for param_name in _category_params:
                 param = input_params[param_name]
 
                 # if param['Required']:
                 #     TODO designate required params
 
+                default_value = _fix_floating_point_error(_get_key(param, 'DefaultValue'))
+
                 min_val, max_val = _get_min_and_max(param)
 
-                input_rst += f"""\n       * - {param['Name']}
+                _input_rst += f"""\n       * - {param['Name']}
          - {_get_key(param, 'ToolTipText')}
          - {_get_key(param, 'PreferredUnits')}
          - {_get_key(param, 'json_parameter_type')}
-         - {_get_key(param, 'DefaultValue')}
+         - {default_value}
          - {min_val}
          - {max_val}"""
 
-            return input_rst
+            return _input_rst
 
         input_rst = ''
         for category, category_params in input_params_by_category.items():
@@ -202,7 +205,8 @@ Output Parameters
 
         return rst
 
-    def get_output_params_table_rst(self, output_params_json) -> str:
+    @staticmethod
+    def get_output_params_table_rst(output_params_json) -> str:
         output_params = json.loads(output_params_json)
 
         output_rst = """
@@ -210,6 +214,7 @@ Output Parameters
        :header-rows: 1
 
        * - Name
+         - Description
          - Preferred Units
          - Default Value Type"""
 
@@ -223,6 +228,7 @@ Output Parameters
                     return ''
 
             output_rst += f"""\n       * - {param['Name']}
+         - {get_key('ToolTipText')}
          - {get_key('PreferredUnits')}
          - {get_key('json_parameter_type')}"""
 
@@ -245,7 +251,14 @@ def _get_min_and_max(param: dict, default_val='') -> Tuple:
         min_val = min(param['AllowableRange'])
         max_val = max(param['AllowableRange'])
 
-    return (min_val, max_val)
+    return _fix_floating_point_error(min_val), _fix_floating_point_error(max_val)
+
+
+def _fix_floating_point_error(val: Any) -> Any:
+    if '.0000' in str(val):
+        return format(float(val), '.1f')
+
+    return val
 
 
 class HipRaXSchemaGenerator(GeophiresXSchemaGenerator):

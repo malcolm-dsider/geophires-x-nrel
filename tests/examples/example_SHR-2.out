@@ -4,10 +4,10 @@
 
 Simulation Metadata
 ----------------------
- GEOPHIRES Version: 3.6.2
- Simulation Date: 2024-10-15
- Simulation Time:  15:20
- Calculation Time:      0.530 sec
+ GEOPHIRES Version: 3.7.1
+ Simulation Date: 2025-01-22
+ Simulation Time:  10:48
+ Calculation Time:      0.543 sec
 
                            ***SUMMARY OF RESULTS***
 
@@ -17,7 +17,7 @@ Simulation Metadata
       Number of production wells:                             2
       Number of injection wells:                              1
       Flowrate per production well:                          60.0 kg/sec
-      Well depth (or total length, if not vertical):          5.0 kilometer
+      Well depth:                                             5.0 kilometer
       Geothermal gradient:                                    112 degC/km
       Total Avoided Carbon Emissions:                          7295.77 kilotonne
 
@@ -40,9 +40,9 @@ Simulation Metadata
 
       Number of Production Wells:                             2
       Number of Injection Wells:                              1
-      Well depth (or total length, if not vertical):          5.0 kilometer
+      Well depth:                                             5.0 kilometer
       Water loss rate:                                        2.0
-      Pump efficiency:                                       80.0
+      Pump efficiency:                                       80.0 %
       Injection temperature:                                 50.0 degC
       Production Wellbore heat transmission calculated with Ramey's model
       Average production well temperature drop:              16.7 degC
@@ -123,6 +123,7 @@ Simulation Metadata
       Average Annual Total Electricity Generation:          856.31 GWh
       Average Annual Net Electricity Generation:            856.31 GWh
       Average Pumping Power:                                  0.00 MW
+      Heat to Power Conversion Efficiency:                   35.83 %
 
                             ************************************************************
                             *  HEATING, COOLING AND/OR ELECTRICITY PRODUCTION PROFILE  *

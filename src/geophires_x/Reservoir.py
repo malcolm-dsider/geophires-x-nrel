@@ -80,8 +80,8 @@ class Reservoir:
             CurrentUnits=TemperatureUnit.CELSIUS,
             Required=True,
             ErrMessage="assume default maximum temperature (400 deg.C)",
-            ToolTipText="Maximum allowable reservoir temperature (e.g. due to drill bit or logging tools constraints). \
-            GEOPHIRES will cap the drilling depth to stay below this maximum temperature."
+            ToolTipText="Maximum allowable reservoir temperature (e.g. due to drill bit or logging tools constraints). "
+                        "GEOPHIRES will cap the drilling depth to stay below this maximum temperature."
         )
 
         self.numseg = self.ParameterDict[self.numseg.Name] = intParameter(
@@ -404,8 +404,8 @@ class Reservoir:
             CurrentUnits=TemperatureUnit.CELSIUS,
             Required=True,
             ErrMessage="assume default surface temperature (15 deg.C)",
-            ToolTipText="Surface temperature used for calculating bottom-hole temperature \
-            (with geothermal gradient and reservoir depth)"
+            ToolTipText="Surface temperature used for calculating bottom-hole temperature "
+                        "(with geothermal gradient and reservoir depth)"
         )
 
         self.usebuiltintough2model = False
@@ -549,12 +549,9 @@ class Reservoir:
                 if key in model.InputParameters:
                     ParameterReadIn = model.InputParameters[key]
 
-                    # Before we change the parameter, let's assume that the unit preferences will match -
-                    # if they don't, the later code will fix this.
                     # TODO: refactor GEOPHIRES such that parameters are read in immutably and only accessed with
                     #  explicit units, with conversion only occurring in the getter as necessary
 
-                    ParameterToModify.CurrentUnits = ParameterToModify.PreferredUnits
                     ReadParameter(ParameterReadIn, ParameterToModify, model)  # this handles all non-special cases
 
                     # handle special cases

@@ -159,8 +159,10 @@ class GeophiresXTestCase(BaseTestCase):
         example_files = list(
             filter(
                 lambda example_file_path: example_file_path.startswith(
-                    ('example', 'Beckers_et_al', 'SUTRA', 'Wanju', 'Fervo')
+                    ('example', 'Beckers_et_al', 'SUTRA', 'Wanju', 'Fervo', 'S-DAC-GT')
                 )
+                # TOUGH not enabled for testing - see https://github.com/NREL/GEOPHIRES-X/issues/318
+                and not example_file_path.startswith(('example6.txt', 'example7.txt'))
                 and '.out' not in example_file_path,
                 self._list_test_files_dir(test_files_dir='examples'),
             )
@@ -288,7 +290,7 @@ Print Output to Console, 1"""
             # https://github.com/NREL/python-geophires-x/issues/13), then error-code-5500.txt should be updated with
             # different input that is still expected to result in error code 5500.
             input_params = GeophiresInputParameters(
-                from_file_path=self._get_test_file_path(Path('error-code-5500.txt'))
+                from_file_path=self._get_test_file_path(Path('geophires_x_tests/error-code-5500.txt'))
             )
             client.get_geophires_result(input_params)
 
@@ -581,3 +583,90 @@ Print Output to Console, 1"""
             assertHasLogRecordWithMessage(
                 logs2, 'Set Discount Rate to 0.042 because Fixed Internal Rate was provided (4.2 percent)'
             )
+
+    def test_transmission_pipeline_cost(self):
+        result = GeophiresXClient().get_geophires_result(
+            GeophiresInputParameters(
+                from_file_path=self._get_test_file_path(Path('examples/Fervo_Norbeck_Latimer_2023.txt')),
+                params={'Surface Piping Length': 5},
+            )
+        )
+
+        self.assertAlmostEqual(
+            result.result['CAPITAL COSTS (M$)']['Transmission pipeline cost']['value'], 3.75, delta=0.5
+        )
+
+    def test_well_drilling_and_completion_capital_cost_adjustment_factor(self):
+        base_file = self._get_test_file_path('geophires_x_tests/generic-egs-case.txt')
+        r_no_adj = GeophiresXClient().get_geophires_result(GeophiresInputParameters(from_file_path=base_file))
+
+        r_noop_adj = GeophiresXClient().get_geophires_result(
+            GeophiresInputParameters(
+                from_file_path=base_file,
+                params={'Well Drilling and Completion Capital Cost Adjustment Factor': 1.0},
+            )
+        )
+
+        r_adj = GeophiresXClient().get_geophires_result(
+            GeophiresInputParameters(
+                from_file_path=base_file,
+                params={'Well Drilling and Completion Capital Cost Adjustment Factor': 1.175},
+            )
+        )
+
+        def c_well(r, prod: bool = False, inj: bool = False):
+            well_type = 'production ' if prod else 'injection ' if inj else ''
+            try:
+                c = r.result['CAPITAL COSTS (M$)'][f'Drilling and completion costs per {well_type}well']['value']
+
+                if not prod and not inj:
+                    # indirect cost is not applied to prod/inj-specific per-well cost;
+                    # see TODO re:parameterizing at src/geophires_x/Economics.py:652
+                    default_indirect_cost_factor = 1.05
+                    c = c / default_indirect_cost_factor
+
+                return c
+            except TypeError:
+                return None
+
+        self.assertEqual(c_well(r_no_adj), c_well(r_noop_adj))
+
+        self.assertAlmostEqual(1.175 * c_well(r_no_adj), c_well(r_adj), delta=0.1)
+
+        r_adj_diff_prod_inj = GeophiresXClient().get_geophires_result(
+            GeophiresInputParameters(
+                from_file_path=base_file,
+                params={
+                    'Well Drilling and Completion Capital Cost Adjustment Factor': 1.175,
+                    'Injection Well Drilling and Completion Capital Cost Adjustment Factor': 3,
+                },
+            )
+        )
+
+        c_well_no_adj = c_well(r_no_adj)
+        c_prod_well_adj = c_well(r_adj_diff_prod_inj, prod=True)
+        c_inj_well_adj = c_well(r_adj_diff_prod_inj, inj=True)
+        self.assertAlmostEqual(1.175 * c_well_no_adj, c_prod_well_adj, delta=0.1)
+        self.assertAlmostEqual(3 * c_well_no_adj, c_inj_well_adj, delta=0.1)
+
+    def test_egs_laterals(self):
+        def _get_result(num_laterals: int) -> GeophiresXResult:
+            return GeophiresXClient().get_geophires_result(
+                GeophiresInputParameters(
+                    from_file_path=self._get_test_file_path('geophires_x_tests/generic-egs-case.txt'),
+                    params={
+                        'Well Geometry Configuration': 4,
+                        'Number of Multilateral Sections': num_laterals,
+                    },
+                )
+            )
+
+        def _c_non_vert(r: GeophiresXResult) -> dict:
+            return r.result['CAPITAL COSTS (M$)']['Drilling and completion costs per non-vertical section']
+
+        self.assertIsNone(_c_non_vert(_get_result(0)))
+
+        r_1 = _get_result(1)
+        self.assertIsNotNone(_c_non_vert(r_1)['value'])
+
+        self.assertEqual(_c_non_vert(r_1)['value'], _c_non_vert(_get_result(2))['value'])

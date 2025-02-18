@@ -316,9 +316,7 @@ class SUTRAEconomics(Economics.Economics):
                 key = ParameterToModify.Name.strip()
                 if key in model.InputParameters:
                     ParameterReadIn = model.InputParameters[key]
-                    # Before we change the parameter, let's assume that the unit preferences will match
-                    # - if they don't, the later code will fix this.
-                    ParameterToModify.CurrentUnits = ParameterToModify.PreferredUnits
+
                     # this should handle all the non-special cases
                     ReadParameter(ParameterReadIn, ParameterToModify, model)
 
@@ -419,7 +417,8 @@ class SUTRAEconomics(Economics.Economics):
             * 1e8
         )  # cents/kWh
 
-        model.logger.info("complete " + str(__class__) + ": " + sys._getframe().f_code.co_name)
+        self._calculate_derived_outputs(model)
+        model.logger.info(f'complete {str(__class__)}: {sys._getframe().f_code.co_name}')
 
     def __str__(self):
         return "Economics"

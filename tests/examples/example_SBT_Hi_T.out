@@ -4,10 +4,10 @@
 
 Simulation Metadata
 ----------------------
- GEOPHIRES Version: 3.6.0
- Simulation Date: 2024-10-15
- Simulation Time:  13:08
- Calculation Time:      6.257 sec
+ GEOPHIRES Version: 3.7.5
+ Simulation Date: 2025-01-31
+ Simulation Time:  11:36
+ Calculation Time:      8.431 sec
 
                            ***SUMMARY OF RESULTS***
 
@@ -17,7 +17,7 @@ Simulation Metadata
       Number of production wells:                             1
       Number of injection wells:                              1
       Flowrate per production well:                          80.0 kg/sec
-      Well depth (or total length, if not vertical):          5.8 kilometer
+      Well depth:                                             5.8 kilometer
       Geothermal gradient:                                     60 degC/km
 
 
@@ -38,9 +38,9 @@ Simulation Metadata
 
       Number of Production Wells:                             1
       Number of Injection Wells:                              1
-      Well depth (or total length, if not vertical):          5.8 kilometer
+      Well depth:                                             5.8 kilometer
       Water loss rate:                                        0.0
-      Pump efficiency:                                       75.0
+      Pump efficiency:                                       75.0 %
       Injection temperature:                                 56.9 degC
       Production Wellbore heat transmission calculated with Ramey's model
       Average production well temperature drop:               0.0 degC
@@ -77,7 +77,7 @@ The AGS models contain an intrinsic reservoir model that doesn't expose values t
          Drilling and completion costs:                     104.87 MUSD
              Drilling and completion costs per vertical production well:         6.19 MUSD
              Drilling and completion costs per vertical injection well:          6.19 MUSD
-             Drilling and completion costs per non-vertical sections:           92.48 MUSD
+             Drilling and completion costs per non-vertical section:             7.71 MUSD
          Stimulation costs:                                   0.00 MUSD
          Surface power plant costs:                          52.76 MUSD
          Field gathering system costs:                        0.97 MUSD
@@ -108,6 +108,7 @@ The AGS models contain an intrinsic reservoir model that doesn't expose values t
       Average Annual Total Electricity Generation:           75.03 GWh
       Average Annual Net Electricity Generation:             75.03 GWh
       Average Pumping Power:                                  0.00 MW
+      Heat to Power Conversion Efficiency:                   17.15 %
 
                             ************************************************************
                             *  HEATING, COOLING AND/OR ELECTRICITY PRODUCTION PROFILE  *

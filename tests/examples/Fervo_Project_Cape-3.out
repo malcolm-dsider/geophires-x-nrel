@@ -4,10 +4,10 @@
 
 Simulation Metadata
 ----------------------
- GEOPHIRES Version: 3.6.4
- Simulation Date: 2024-11-13
- Simulation Time:  10:52
- Calculation Time:      0.863 sec
+ GEOPHIRES Version: 3.7.1
+ Simulation Date: 2025-01-22
+ Simulation Time:  10:48
+ Calculation Time:      0.889 sec
 
                            ***SUMMARY OF RESULTS***
 
@@ -17,7 +17,7 @@ Simulation Metadata
       Number of production wells:                            39
       Number of injection wells:                             39
       Flowrate per production well:                         120.0 kg/sec
-      Well depth (or total length, if not vertical):          2.6 kilometer
+      Well depth:                                             2.6 kilometer
       Geothermal gradient:                                     74 degC/km
 
 
@@ -38,9 +38,9 @@ Simulation Metadata
 
       Number of Production Wells:                            39
       Number of Injection Wells:                             39
-      Well depth (or total length, if not vertical):          2.6 kilometer
+      Well depth:                                             2.6 kilometer
       Water loss rate:                                        5.0
-      Pump efficiency:                                       80.0
+      Pump efficiency:                                       80.0 %
       Injection temperature:                                 56.7 degC
       Production Wellbore heat transmission calculated with Ramey's model
       Average production well temperature drop:               1.7 degC
@@ -128,6 +128,7 @@ Simulation Metadata
       Average Annual Net Electricity Generation:           3171.75 GWh
       Initial pumping power/net installed power:             13.50 %
       Average Pumping Power:                                 53.73 MW
+      Heat to Power Conversion Efficiency:                   14.39 %
 
                             ************************************************************
                             *  HEATING, COOLING AND/OR ELECTRICITY PRODUCTION PROFILE  *
